@@ -25,7 +25,7 @@ static struct lua_constant continuator_constants[] = {
   {NULL, 0}
 };
 
-static const luaL_reg continuatorR[] = {
+static const luaL_Reg continuatorR[] = {
   {"new", lua_continuator_new},
   {NULL, NULL}
 };
@@ -50,7 +50,7 @@ static void add_constants(lua_State *L, struct lua_constant *cn)
 
 int luaopen_continuator(lua_State *L) {
   int NARG = lua_gettop(L);
-  luaL_register(L, "continuator", continuatorR);
+  luaL_setfuncs(L, continuatorR, 0);
   
   add_constants(L, continuator_constants);
   

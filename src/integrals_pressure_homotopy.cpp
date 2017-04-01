@@ -29,7 +29,7 @@ static int u_homotopy_symmetric_s(lua_State*);
 
 extern "C" const char integrals_lualib_name[]   = "integrals_pressure";
 extern "C" const char integrals_lualib_regkey[] = "integrals_pressure_rk";
-extern "C" const luaL_reg integralsR[] = {
+extern "C" const luaL_Reg integralsR[] = {
 {"u_s", u_homotopy_s},
 {"x_s", x_homotopy_s},
 {"y_s", y_homotopy_s},

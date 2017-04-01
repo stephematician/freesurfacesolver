@@ -6,9 +6,7 @@
 # Revision notes:
 #
 # 1/3/2013 Phased out wnl and wnl_global, phasing out integrals_hfall, and integrals_triangle.
-#
-# Phasing out wnl and wnl_global, I believe this stuff will be done with MATLAB
-# from now on.
+# 1/4/2017 Phased out integrals_hfall, integrals_box and integrals_triangle
 
 linux : LUA_NAME := lua5.2
 macosx : LUA_NAME := lua
@@ -21,26 +19,20 @@ LUA_TEST = $(shell echo $(LUA_VERSION) $(LUA_VERSION_REQD) | awk '{if (($$1 - $$
 
 linux : LT_OEXT := .so.0.0.0
 linux : LT_EXT := .la
-linux : LT_PRE := lib
 linux : LT_CEXT := .lo
+linux : LT_PRE := lib
 linux : LT_OPRE := .libs/lib
 macosx : LT_OEXT := .so
 macosx : LT_EXT := .so
-macosx : LT_PRE :=
-macosx : LT_OPRE :=
-macosx : LT_ODIR := ./
 macosx : LT_CEXT := .o
+macosx : LT_PRE :=
+macosx : LT_OPRE := 
 
-
-#LUA_MODS := integrals_hfall.so integrals_triangle.so \
-#  integrals_sbox_homotopy.so \
-#  integrals_box_homotopy.so  integrals_box_cluster.so \
-#  integrals_pressure_homotopy.so \
-#  continuator.so
-
-LUA_MODS := integrals_sbox_homotopy.so \
-  integrals_pressure_homotopy.so \
-  continuator.so
+ROOT_DIR    = $(PWD)
+LIB_DIR     = $(ROOT_DIR)/lib
+INCLUDE_DIR = $(ROOT_DIR)/include
+OBJ_DIR     = $(ROOT_DIR)/build
+BIN_DIR     = $(ROOT_DIR)/bin
 
 LUA_CFLAGS = $(shell pkg-config --cflags $(LUA_NAME))
 LUA_LIBS = $(shell pkg-config --libs $(LUA_NAME))
@@ -55,23 +47,24 @@ macosx : LUA_MOD_LINK = $(CXX) -bundle -undefined dynamic_lookup
 macosx : LUA_MOD_COMPILE = $(CXX) -fPIC -c
 
 LIBS = $(LUA_LIBS) $(GSL_LIBS)
-CFLAGS = $(LUA_CFLAGS) $(GSL_CFLAGS) -D __VECTOR_USE_GSL
+CFLAGS = -I$(INCLUDE_DIR) $(LUA_CFLAGS) $(GSL_CFLAGS) -D __VECTOR_USE_GSL
+
+export LT_OEXT LT_EXT LT_CEXT LT_PRE LT_OPRE
+export CFLAGS LIBS INCLUDE_DIR OBJ_DIR LIB_DIR BIN_DIR
+export LUA_MOD_COMPILE LUA_MOD_LINK
 
 .PHONY: clean linux macosx checks
 
 default :
 	@echo Choose make linux, macosx.
 
-
-linux : checks memtest $(LUA_MODS)
+linux : checks
+	cd src && $(MAKE) $@
 #	doxygen 2>html/doxygen.wlog > html/doxygen.log
 
-macosx : checks $(LUA_MODS)
+macosx : checks
+	cd src && $(MAKE) $@
 #	doxygen 2>html/doxygen.wlog > html/doxygen.log
-
-memtest : memtest.c
-	$(CXX) $(CFLAGS) -c -o memtest.o memtest.c
-	$(CXX) -o memtest memtest.o $(LUA_LIBS)
 
 checks :
 	@echo $(LUA_VERSION)
@@ -79,64 +72,8 @@ checks :
   $(subst 0, Lua version XX or greater found, \
   $(subst 1, warning : Require lua version XX or greater, $(LUA_TEST))))
 
-#integrals_hfall.so : integrals_hfall.cpp vector.o
-#	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_hfall.cpp
-#	$(LUA_MOD_LINK) $(GSL_LIBS) -o $(LT_PRE)integrals_hfall$(LT_EXT) integrals_hfall$(LT_CEXT) vector$(LT_CEXT) 
-#	mv $(LT_OPRE)integrals_hfall$(LT_OEXT) integrals_hfall.so
-
-#integrals_triangle.so : integrals_triangle.cpp vector.o
-#	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_triangle.cpp
-#	$(LUA_MOD_LINK) $(GSL_LIBS) -o $(LT_PRE)integrals_triangle$(LT_EXT) integrals_triangle$(LT_CEXT) vector$(LT_CEXT) 
-#	mv $(LT_OPRE)integrals_triangle$(LT_OEXT) integrals_triangle.so
-
-integrals_pressure_homotopy.so : integrals_pressure.o integrals_pressure_formulation.o vector.o integrals_pressure_homotopy.cpp 
-	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_pressure_homotopy.cpp
-	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_pressure_homotopy$(LT_EXT) integrals_pressure$(LT_CEXT) integrals_pressure_formulation$(LT_CEXT) integrals_pressure_homotopy$(LT_CEXT) vector$(LT_CEXT) $(GSL_LIBS)
-	mv $(LT_OPRE)integrals_pressure_homotopy$(LT_OEXT) integrals_pressure_homotopy.so
-
-integrals_pressure_formulation.o : integrals_pressure_formulation.cpp integrals_pressure_formulation.h vector.h
-	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_pressure_formulation.cpp
-
-integrals_pressure.o : integrals_pressure.cpp integrals_pressure.h vector.h
-	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_pressure.cpp
-
-#integrals_box_cluster.so : integrals_box.o integrals_box_formulation.o vector.o integrals_box_cluster.cpp 
-#	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_box_cluster.cpp
-#	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_box_cluster$(LT_EXT) integrals_box$(LT_CEXT) integrals_box_formulation$(LT_CEXT) integrals_box_cluster$(LT_CEXT) vector$(LT_CEXT) $(GSL_LIBS)
-#	mv $(LT_OPRE)integrals_box_cluster$(LT_OEXT) integrals_box_cluster.so
-
-#integrals_box_homotopy.so : integrals_box.o integrals_box_formulation.o vector.o integrals_box_homotopy.cpp 
-#	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_box_homotopy.cpp
-#	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_box_homotopy$(LT_EXT) integrals_box$(LT_CEXT) integrals_box_formulation$(LT_CEXT) integrals_box_homotopy$(LT_CEXT) vector$(LT_CEXT) $(GSL_LIBS)
-#	mv $(LT_OPRE)integrals_box_homotopy$(LT_OEXT) integrals_box_homotopy.so
-
-#integrals_box_formulation.o : integrals_box_formulation.cpp integrals_box_formulation.h vector.h
-#	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_box_formulation.cpp
-
-#integrals_box.o : integrals_box.cpp integrals_box.h vector.h
-#	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_box.cpp
-
-integrals_sbox_homotopy.so : integrals_sbox.o integrals_sbox_formulation.o vector.o integrals_sbox_homotopy.cpp 
-	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_sbox_homotopy.cpp
-	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_sbox_homotopy$(LT_EXT) integrals_sbox$(LT_CEXT) $(GSL_LIBS) integrals_sbox_formulation$(LT_CEXT) integrals_sbox_homotopy$(LT_CEXT) vector$(LT_CEXT) 
-	mv $(LT_OPRE)integrals_sbox_homotopy$(LT_OEXT) integrals_sbox_homotopy.so
-
-integrals_sbox_formulation.o : integrals_sbox_formulation.cpp integrals_sbox_formulation.h vector.h
-	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_sbox_formulation.cpp
-
-integrals_sbox.o : integrals_sbox.cpp integrals_sbox.h vector.h
-	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_sbox.cpp
-
-vector.o : vector.cpp
-	$(LUA_MOD_COMPILE) $(CFLAGS) vector.cpp
-
-continuator.so : continuator.cpp vector.o
-	$(LUA_MOD_COMPILE) $(CFLAGS) continuator.cpp
-	$(LUA_MOD_LINK) -o $(LT_PRE)continuator$(LT_EXT) continuator$(LT_CEXT) vector$(LT_CEXT) $(GSL_LIBS)
-	mv $(LT_OPRE)continuator$(LT_OEXT) continuator.so
-
 clean :
+	cd src/ && $(MAKE) clean
 	rm -f html/*
 	rm -f .libs/*
-	rm -f *~
 	rm -f *.so *.lo *.la *.o

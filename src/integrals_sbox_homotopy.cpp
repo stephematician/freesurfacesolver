@@ -39,7 +39,7 @@ static int tau_smoothbox_symmetric_s(lua_State*);
 
 extern "C" const char integrals_lualib_name[]   = "integrals_sbox";
 extern "C" const char integrals_lualib_regkey[] = "integrals_sbox_rk";
-extern "C" const luaL_reg integralsR[] = {
+extern "C" const luaL_Reg integralsR[] = {
 {"tau_gaussian_s", tau_gaussian_s},
 {"tau_smoothbox_s", tau_smoothbox_s},
 {"x_s", x_homotopy_s},
