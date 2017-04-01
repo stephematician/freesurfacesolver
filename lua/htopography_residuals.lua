@@ -2,9 +2,9 @@ require "surface"
 require "integrals_sbox_homotopy"
 require "grid_functions"
 
-module("htopography_residuals", package.seeall)
+local htopography_residuals = {}
 
-bernoulli = function(tau, eta, froude)
+local bernoulli = function(tau, eta, froude)
   local f_sq  = froude * froude
   local alpha = math.exp(2.0*tau[#tau]) + (2.0*eta[#eta] / f_sq)
   local val = {}
@@ -18,7 +18,7 @@ bernoulli = function(tau, eta, froude)
   return val
 end
 
-compute_bttxe_hs = function(unpacked, x_calculation)
+htopography_residuals.compute_bttxe_hs = function(unpacked, x_calculation)
 
   -- Theta on free surface
   local theta_s    = unpacked.THETA_S
@@ -85,6 +85,7 @@ compute_bttxe_hs = function(unpacked, x_calculation)
 end
 
 --[[
+-- Should be the generic (non-symmetric) residuals)
 compute_bttxe_hg = function(unpacked)
 
   -- Theta on free surface
@@ -213,7 +214,7 @@ compute_output_hg = function(unpacked)
 end
 --]]
 
-compute_output_hs = function(unpacked)
+htopography_residuals.compute_output_hs = function(unpacked)
 
   local t = {}
     
@@ -508,174 +509,4 @@ residual_hs = function(unknowns, extra)
   return val
 end
 
--- **************************************************************************************************************** --
--- **************************************************************************************************************** --
---[[
-residual_hg = function(unknowns, extra)
-  local fs = extra[1]
-
-  local unpacked = surface.unpack_vec(unknowns,
-                                    fs.initial,
-                                    fs.is_free,
-                               fs.is_continued,
-                                  fs.ind_table)
-                                  
-  -- Theta on the free surface
-  local theta_s    = unpacked.THETA_S
-
-  -- Parameters of topography
-  local topography_a = unpacked.TOPOGRAPHY_A
-  local topography_b = unpacked.TOPOGRAPHY_B
-
-  -- Flow parameters
-  local froude     = unpacked.FROUDE
-  local eta0       = unpacked.ETA0
-
-  -- Far-stream parameters
-  local lambda     = unpacked.LAMBDA
-  local Du_dstream = unpacked.Du_DSTREAM
-  local Dv_dstream = unpacked.Dv_DSTREAM
-  local Du_ustream = unpacked.Du_USTREAM
-  local Dv_ustream = unpacked.Dv_USTREAM
-  local gamma      = unpacked.GAMMA
-
-  -- Grid parameters
-  local beta_sub   = unpacked.BETA_SUB
-  local phi_sub    = unpacked.PHI_SUB
-  local dphi_sub   = unpacked.DPHI_SUB
-  local n_sub      = unpacked.N_SUB
-  local n_b        = unpacked.N_B
-  local homotopy_s = unpacked.HOMOTOPY_S
-
-  -- Optional flow parameters
-  local u_min       = unpacked.U_MIN
-  local cluster_val = unpacked.CLUSTER_VAL
-
-  local beta_s, theta_s_mid, tau_s_mid,
-                    x_s_mid,     x_lhs,
-                  eta_s_mid,   eta_lhs = compute_bttxe_hg(unpacked)
-  local beta_s_mid = {}
-  for i = 1, (#beta_s)-1 do
-    beta_s_mid[i] = (beta_s[i] + beta_s[i+1]) / 2.0
-  end
-  
-  local phi_s_mid  = integrals_sbox.phi(beta_s_mid,
-                                          beta_sub,
-                                           phi_sub,
-                                          dphi_sub,
-                                        homotopy_s)
-
-  if print_out then
-    io.flush()
-    io.write('\nphi_sub = [')
-    for kk,vv in pairs(phi_sub) do
-      io.write(tostring(vv) .. ' ')
-    end
-    io.write('];\n')
-    io.flush()
-    
-    io.write('dphi_sub = [')
-    for kk,vv in pairs(dphi_sub) do
-      io.write(tostring(vv) .. ' ')
-    end
-    io.write('];\n')
-    io.flush()
-  end
-
-  local n = (#theta_s)
-
-  if print_out then
-    io.write('About to compute bernoullis eqn ...')
-  end
-
-  local val = bernoulli(tau_s_mid, eta_s_mid, froude) -- N-3 equations
-  if print_out then
-    io.write(' done.\n')
-    io.write('Compute crest equations and linearised stuff ...')
-    io.flush()
-  end 
-
-  -- Equations for crest(s)
-  local k = 0
-  for i = 1, (#n_sub-1) do
-     k = k + n_sub[i]
-     val[#val+1] = (theta_s_mid[k] + theta_s_mid[k+1])
-  end
-
-  -- Far field matching equations
-  local phi_asymp_a = phi_s_mid[n-1]
-  local u_lim_asymp_a   = 1 - (Du_dstream*math.cos(lambda)*math.exp(-lambda*phi_asymp_a))
-  local v_lim_asymp_a   = -(Dv_dstream*math.sin(lambda)*math.exp(-lambda*phi_asymp_a))
-
-  local tau_lim_asymp_a = math.log(u_lim_asymp_a * u_lim_asymp_a + v_lim_asymp_a * v_lim_asymp_a) / 2.0
-  val[#val+1] = tau_s_mid[n-1] - tau_lim_asymp_a
-
-  local theta_lim_asymp_a = math.atan(v_lim_asymp_a / u_lim_asymp_a)
-  val[#val+1] = theta_s_mid[n-1] - theta_lim_asymp_a
-
-  local phi_asymp_c = phi_s_mid[1]
-  local u_lim_asymp_c   = 1 - (Du_ustream*math.cos(lambda)*math.exp(lambda*phi_asymp_c))
-  local v_lim_asymp_c   = -(Dv_ustream*math.sin(lambda)*math.exp(lambda*phi_asymp_c))
-
-  local tau_lim_asymp_c = math.log(u_lim_asymp_c * u_lim_asymp_c + v_lim_asymp_c * v_lim_asymp_c) / 2.0
-  val[#val+1] = tau_s_mid[1] - tau_lim_asymp_c
-
-  -- Dv_dstream =  Du_dstream,  Dv_ustream = -Du_ustream
-  val[#val+1] = Dv_dstream - Du_dstream
-  val[#val+1] = Dv_ustream + Du_ustream
-
-  local theta_lim_asymp_c = math.atan(v_lim_asymp_c / u_lim_asymp_c)
-  val[#val+1] = theta_s_mid[1] - theta_lim_asymp_c
-
-  -- Equation for linearised far field
-  val[#val+1] = math.tan(lambda) - froude*froude*lambda -- 122
-
-  -- Geometry equations
-  val[#val+1] = eta_s_mid[math.floor(n/2)] - eta0 -- 127
-
-  if print_out then
-    io.write(' done.\n')
-    io.write('Optional parameters ... ')
-    io.flush()
-  end
-    
-  -- Optional parameters
-  if u_min then
-    local integral_u_min = 1/0
-    for kk, vv in pairs(tau_s_mid) do
-      if (math.cos(theta_s_mid[kk])*math.exp(vv)) < integral_u_min then
-        integral_u_min = math.cos(theta_s_mid[kk])*math.exp(vv)
-      end
-    end
-    val[#val+1] = u_min - integral_u_min
-  end
-
-  if cluster_val then
-    local k = 1
-    for i = 1, (#n_sub) do
-      local u_k = unit_clamp(math.cos(theta_s_mid[k])*math.exp(tau_s_mid[k]))
-      if print_out_box then print(u_k) end
-      val[#val+1] = dphi_sub[i] - (((cluster_val * math.pow(1-u_k,2)) +
-                                   ((phi_sub[#phi_sub] - phi_sub[1])  * math.pow(u_k,2)))/n)
-      k = k + n_sub[i]
-    end
-    assert(k == n, 'Failed assertion k == n for some thing')
-    local u_k = unit_clamp(math.cos(theta_s_mid[#theta_s_mid])*math.exp(tau_s_mid[#tau_s_mid]))
-    if print_out_box then print(u_k) end
-    val[#val+1] = dphi_sub[#dphi_sub] - (((cluster_val * math.pow(1-u_k,2)) +
-                                         ((phi_sub[#phi_sub] - phi_sub[1]) * math.pow(u_k,2)))/n)
-  end
-  
-  if print_out then
-    io.write(' done.\nValue of residuals :\n')
-    for kk, vv in pairs(val) do
-      io.write(tostring(kk) .. ' : ' .. tostring(vv) .. '.\n')
-    end
-    io.flush()
-  end
-
-  return val
-
-end
---]]
-
+return htopography_residuals

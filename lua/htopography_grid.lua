@@ -1,11 +1,13 @@
 require "htopography_residuals"
 require "grid_functions"
 
-module("htopography_grid", package.seeall)
+local htopography_grid = {}
+
+local dcopy
 
 -- Okay this has literally *one* change from gtopography_grid ... maybe I need to fix this structure.
 
-deepcopy = function(object)
+dcopy = function(object)
   local lookup_table = {}
   local function _copy(object)
     if type(object) ~= "table" then
@@ -23,7 +25,7 @@ deepcopy = function(object)
   return _copy(object)
 end
 
-regrid_hs = function(insurf)
+htopography_grid.regrid_hs = function(insurf)
 
   local initial_surf = surface.unpack_vec(insurf.unknowns,
                                            insurf.initial,
@@ -111,9 +113,6 @@ regrid_hs = function(insurf)
     is_continued_surf.PHI_SUB[#newN_SUB+1] = false
     is_continued_surf.DPHI_SUB[#newN_SUB+1] = false
 
-    -- GROSS VARIABLE
-    -- temp hack
-    --htopography_residuals.print_out = true
     local newsurface = surface.new(initial_surf,
                                    is_free_surf,
                               is_continued_surf,
@@ -122,82 +121,15 @@ regrid_hs = function(insurf)
 
     local c_direction = insurf:get_direction()
 
-    --[[
-    io.write('init_x = [')
-    for kk, vv in pairs(ix_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('init_y = [')
-    for kk, vv in pairs(ieta_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('init_phi = [')
-    for kk, vv in pairs(iphi_s) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('init_theta = [')
-    for kk, vv in pairs(itheta_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('init_tau = [')
-    for kk, vv in pairs(itau_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-  --]]
     local mbeta_s, mtheta_s_mid, mtau_s_mid,
                        mx_s_mid,     mx_lhs,
                      meta_s_mid,   meta_lhs = 
---                           htopography_residuals.compute_bttxe_hs(initial_surf) -- Change here.
-                      htopography_residuals.compute_bttxe_hs(initial_surf,true) -- Change here.
+                      htopography_residuals.compute_bttxe_hs(initial_surf,true)
   local mphi_s  = integrals_sbox.phi(mbeta_s,
                        initial_surf.BETA_SUB,
                         initial_surf.PHI_SUB,
                        initial_surf.DPHI_SUB,
                      initial_surf.HOMOTOPY_S)
-  --[[
-    io.write('inter_x = [')
-    for kk, vv in pairs(mx_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('inter_y = [')
-    for kk, vv in pairs(meta_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('inter_phi = [')
-    for kk, vv in pairs(mphi_s) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('inter_theta = [')
-    for kk, vv in pairs(mtheta_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-    io.write('inter_tau = [')
-    for kk, vv in pairs(mtau_s_mid) do
-      io.write(' ' .. vv)
-    end
-    io.write('];\n')
-    io.flush()
-
-    error('temporary break')--]]
-
     local res = newsurface:progress(0, c_direction, newsurface)
 
     -- This doesn't account for bifurcation :(
@@ -209,7 +141,7 @@ regrid_hs = function(insurf)
                                       newsurface.is_free,
                                   newsurface.is_continued,
                                      newsurface.ind_table)
-
+    --[[ SOME TEMPORARY CHANGES - can't remember why --]]
     newsurface:set_max_stepsize(insurf:get_max_stepsize())
     --newsurface:set_prev_stepsize(insurf:get_prev_stepsize())
     --newsurface:set_prev_length_vars(insurf:get_prev_length_vars())
@@ -258,9 +190,11 @@ regrid_hs = function(insurf)
              ' to converge with new grid.')
     end
     --]] -- END OF TEMPORARY DISABLE
-    return newsurface, c_direction -- deepcopy(insurf.prev_length_vars)
+    return newsurface, c_direction
   else
     return insurf, insurf:get_direction()
   end
 
 end
+
+return htopography_grid

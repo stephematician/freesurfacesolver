@@ -1,4 +1,4 @@
-module("grid_functions", package.seeall)
+local grid_functions = {}
 
 --[[ Calculate value of beta for grid
 
@@ -8,7 +8,7 @@ module("grid_functions", package.seeall)
      important about how it relates to the choice of dphi.
 
 ]]--
-calculate_beta = function(n_sub)
+grid_functions.calculate_beta = function(n_sub)
   local beta = {}
 
   local k = 1
@@ -38,7 +38,7 @@ end
     that #f == #phi.
 
 --]]
-interp_cubic = function(phi, f, nphi)
+grid_functions.interp_cubic = function(phi, f, nphi)
   local b = 0
   local nf = {}
 
@@ -117,7 +117,7 @@ end
 
      ensures that phi_peaks(i) lies in the correct interval of phi given i_peaks(i)
 --]]
-find_peaks_uv = function(phi, v, u_mid)
+local find_peaks_uv = function(phi, v, u_mid)
   local phi_peaks = {}
   local i_peaks = {}
 
@@ -165,18 +165,7 @@ find_peaks_uv = function(phi, v, u_mid)
 
     end
   end
-  
---  print(' --------- peaks summary ------------')
---  print('phi_peaks')
---  for kk,vv in pairs(phi_peaks) do
---    print(kk,vv)
---  end
---  print('i_peaks')
---  for kk,vv in pairs(i_peaks) do
---    print(kk,vv)
---  end
---  print(' --------- end print summary --------')
-  
+
   assert(#phi_peaks == #i_peaks, "Function find_peaks\n" ..
                                  "Failed post-condition #phi_peaks == #i_peaks\n" ..
                                  "Exit\n\n") 
@@ -210,7 +199,7 @@ end
 
      ensures that phi_peaks(i) lies in the correct interval of phi given i_peaks(i)
 --]]
-find_peaks = function(phi, theta, tau_mid)
+local find_peaks = function(phi, theta, tau_mid)
   local phi_peaks = {}
   local i_peaks = {}
 
@@ -246,19 +235,7 @@ find_peaks = function(phi, theta, tau_mid)
 
     end
   end
-  
---  print(' --------- peaks summary ------------')
---  print('phi_peaks')
---  for k,v in pairs(phi_peaks) do
---    print(k,v)
---  end
---  print('i_peaks')
---  for k,v in pairs(i_peaks) do
---    print(k,v)
---  end
---  print(' --------- end print summary --------')
-  
-
+ 
   assert(#phi_peaks == #i_peaks, "Function find_peaks\n" ..
                                  "Failed post-condition #phi_peaks == #i_peaks\n" ..
                                  "Exit\n\n") 
@@ -276,7 +253,7 @@ find_peaks = function(phi, theta, tau_mid)
   return phi_peaks, i_peaks
 end
 
-convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_func)
+grid_functions.convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_func)
   local compute_bsub = function(phi_crit_a, phi_crit_b, u_a, u_b)
      return (phi_crit_b - phi_crit_a) / math.pow(u_a + u_b,1)
   end
@@ -317,10 +294,8 @@ convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_f
     ukb = math.max(math.min(ukb,1.0),0.0)
 
     local weighted_bsub_k = compute_bsub(phi_crit[k], phi_crit[k+1], uka, ukb)
---    print('weighted_k', weighted_bsub_k)
     weighted_bsub_total = weighted_bsub_total + weighted_bsub_k
   end
---  print('weighted_total', weighted_bsub_total)
 
   --[[
   Initial entries are related to the centre of the wave phi = 0
@@ -339,7 +314,7 @@ convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_f
   --]]
   local cu_bsub_k = 0
   local cu_nsub_k = 0
---  io.write('cu_nsub_k, cu_bsub_k :\n')
+
   for k = 2, #phi_crit-1 do
     nphi_sub[k] = phi_crit[k]
 
@@ -352,13 +327,10 @@ convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_f
     local del_bsub_k = compute_bsub(phi_crit[k-1], phi_crit[k], uja, ujb)
     
     cu_bsub_k = cu_bsub_k + del_bsub_k
-    -- math.round == math.floor(0.5 + )
     nn_sub[k-1] = math.floor(0.5 + (cu_bsub_k * (n-1) / weighted_bsub_total)) - cu_nsub_k
     cu_nsub_k = cu_nsub_k + nn_sub[k-1]
---    io.write(k .. ' ' .. cu_nsub_k .. ', ' .. cu_bsub_k .. '\n')
     nbeta_sub[k] = nbeta_sub[k-1] + nn_sub[k-1]
   end
---  io.flush()
 
   nphi_sub[#nphi_sub+1]   = phi_crit[#phi_crit]
 
@@ -371,7 +343,6 @@ convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_f
   local del_bsub_k = compute_bsub(phi_crit[#phi_crit-1], phi_crit[#phi_crit], uNa, uNb)
 
   cu_bsub_k = cu_bsub_k + del_bsub_k
-  -- math.round == math.floor(0.5 + )
   if #phi_crit > 2 then
     nn_sub[#nn_sub+1]     = math.floor(0.5 + (cu_bsub_k * (n-1) / weighted_bsub_total)) - cu_nsub_k
   else
@@ -382,12 +353,9 @@ convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_f
   nbeta_sub[#nbeta_sub+1] = nbeta_sub[#nbeta_sub] + nn_sub[#nn_sub]
 
   local sum_nn_sub = 0
---  io.write('new n_sub\n')
   for i = 1, #nn_sub do
---     io.write(i .. ' ' .. nn_sub[i] .. '\n')
     sum_nn_sub = sum_nn_sub + nn_sub[i]
   end
---  io.flush()
 
   assert(sum_nn_sub == (n-1), 'Failed assertion that sum(nn_sub) = n-1')
   assert(nbeta_sub[#nbeta_sub] == n, 'Failed assertion that nbeta_sub[end] = n')
@@ -401,7 +369,7 @@ convert_grid_uv_hs = function(phi, v, u_mid, n, cluster_coeff, homotopy_s, phi_f
 end
 
 --[[ Converts grid from having no peak-data to having peak data. --]]
-convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff, homotopy_s, phi_func)
+grid_functions.convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff, homotopy_s, phi_func)
 
   local compute_bsub = function(phi_crit_a, phi_crit_b, u_a, u_b)
      return (phi_crit_b - phi_crit_a) / math.pow(u_a + u_b,1)
@@ -447,10 +415,8 @@ convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff, homotopy_s, ph
     ukb = math.max(math.min(ukb,1.0),0.0)
 
     local weighted_bsub_k = compute_bsub(phi_crit[k], phi_crit[k+1], uka, ukb)
---    print('weighted_k', weighted_bsub_k)
     weighted_bsub_total = weighted_bsub_total + weighted_bsub_k
   end
---  print('weighted_total', weighted_bsub_total)
 
   --[[
   Initial entries are related to the centre of the wave phi = 0
@@ -481,7 +447,6 @@ convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff, homotopy_s, ph
     local del_bsub_k = compute_bsub(phi_crit[k-1], phi_crit[k], uja, ujb)
     
     cu_bsub_k = cu_bsub_k + del_bsub_k
-    -- math.round == math.floor(0.5 + )
     nn_sub[k-1] = math.floor(0.5 + (cu_bsub_k * (n-1) / weighted_bsub_total)) - cu_nsub_k
     cu_nsub_k = cu_nsub_k + nn_sub[k-1]
     nbeta_sub[k] = nbeta_sub[k-1] + nn_sub[k-1]
@@ -498,9 +463,8 @@ convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff, homotopy_s, ph
   local del_bsub_k = compute_bsub(phi_crit[#phi_crit-1], phi_crit[#phi_crit], uNa, uNb)
 
   cu_bsub_k = cu_bsub_k + del_bsub_k
-  -- math.round == math.floor(0.5 + )
   if #phi_crit > 2 then
-    nn_sub[#nn_sub+1]     = math.floor(0.5 + (cu_bsub_k * (n-1) / weighted_bsub_total)) - cu_nsub_k
+    nn_sub[#nn_sub+1] = math.floor(0.5 + (cu_bsub_k * (n-1) / weighted_bsub_total)) - cu_nsub_k
   else
     nn_sub = {n-1}
   end
@@ -509,12 +473,9 @@ convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff, homotopy_s, ph
   nbeta_sub[#nbeta_sub+1] = nbeta_sub[#nbeta_sub] + nn_sub[#nn_sub]
 
   local sum_nn_sub = 0
---  io.write('new n_sub\n')
   for i = 1, #nn_sub do
---     io.write(i .. ' ' .. nn_sub[i] .. '\n')
     sum_nn_sub = sum_nn_sub + nn_sub[i]
   end
---  io.flush()
 
   assert(sum_nn_sub == (n-1), 'Failed assertion that sum(nn_sub) = n-1')
   assert(nbeta_sub[#nbeta_sub] == n, 'Failed assertion that nbeta_sub[end] = n')
@@ -526,3 +487,5 @@ convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff, homotopy_s, ph
   return ntheta, nbeta_sub, nn_sub, nphi_sub, ndphi_sub
 
 end
+
+return grid_functions

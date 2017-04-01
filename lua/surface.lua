@@ -10,17 +10,20 @@
 
 require "continuator"
 
+local surface = {}
+
 module("surface", package.seeall)
 
 local dcopy
 local create_file
 local append_file
+local pack_vec
 
-new = function(in_initial,
-               in_is_free,
-          in_is_continued, 
-              in_residual,
-        in_compute_output)
+surface.new = function(in_initial,
+                       in_is_free,
+                  in_is_continued, 
+                      in_residual,
+                in_compute_output)
 
   r_table = {}
   
@@ -523,7 +526,7 @@ pack_vec = function(current, is_free, is_continued)
   
 end
 
-unpack_vec = function(packed, initial, is_free, is_continued, ind_table)
+surface.unpack_vec = function(packed, initial, is_free, is_continued, ind_table)
 --[[ Comment?
 --]]
   current = {}
@@ -531,7 +534,7 @@ unpack_vec = function(packed, initial, is_free, is_continued, ind_table)
   c_specified = false
 
   for k, cvec in pairs(initial) do
-    
+
     if type(cvec) == "number" then
       if is_free[k] then
         if not is_continued[k] then
@@ -552,7 +555,7 @@ unpack_vec = function(packed, initial, is_free, is_continued, ind_table)
         end
         current[k] = cvec;
       end
-  
+
     elseif type(cvec) == "table" then
       current[k] = {}
       for kk, cnum in pairs(cvec) do
@@ -575,18 +578,18 @@ unpack_vec = function(packed, initial, is_free, is_continued, ind_table)
           end
           (current[k])[kk] = cnum;
         end
-        
+
       end -- Iteration over the table initial[cvec]
-      
+
     else -- type of cvec not == number or table
       error([=[ Expected a table containing numbers and tables of numbers for
              pack vector]=]);
     end
-    
+
   end -- Iteration over pairs(initial)
-  
+
   return current
-  
+
 end
 
 --create_file = function(filename, delta)
@@ -615,7 +618,7 @@ create_file = function(filename)
   of:write("function [ o ] = " .. fn_name .. "()\n\n")
   of:write("\nend\n")
   of:close()
-    
+
 end
 
 append_file = function(filename,
@@ -624,7 +627,7 @@ append_file = function(filename,
                         is_free,
                    is_continued,
                       ind_table,
-                 compute_output)--,
+                 compute_output),
 
   of = io.open(filename, "r+")
 
@@ -645,7 +648,7 @@ append_file = function(filename,
     fn_name = string.sub(filename, 1, string.length(filename))
     end
   end
-  
+
   of:seek("set", string.len("%% "))
   n = of:read("*n")
   n = n + 1
@@ -654,37 +657,39 @@ append_file = function(filename,
   of:write("function [ o ] = " .. fn_name .. "()\n\n")
 
   of:close()
-                                
+                  
   temp = unpack_vec(packed, initial, is_free, is_continued, ind_table)
-  
+
   out_table = compute_output(temp)
-  
+
   of = io.open(filename, "r+")
   of:seek("end", -string.len("end\n"))
-    
+
   for k, v in pairs(out_table) do
     if type(v) == "number" then
-    
+
       of:write("  o." .. k .. "{" .. n .. "} = " .. v .. ";\n")
-      
+
     elseif type(v) == "table" then
-    
+
       of:write("  o." .. k .. "{" .. n .. "} = [")
-      
+
       for kk, vv in pairs(v) do
 
         of:write(vv .. " ")
       end
-      
+
       of:write("];\n")
-      
+
     else -- wtf
       error("Output computed of surface should be vectors and scalars only")
     end
   end
 
   of:write("\nend\n")
-  
+
   of:close()
-  
+
 end
+
+return surface

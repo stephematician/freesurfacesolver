@@ -2,9 +2,9 @@
 require "integrals_sbox_homotopy"
 require "grid_functions"
 
-module("htopography_load", package.seeall)
+local htopography_load = {}
 
-load_last = function(file_name, init_tables_fn, hi_res_n)
+htopography_load.load_last = function(file_name, init_tables_fn, hi_res_n)
 
   local surf_file = assert(io.open(file_name, "r"))
 
@@ -162,3 +162,5 @@ load_last = function(file_name, init_tables_fn, hi_res_n)
   return loaded_fs, is_free_fs, is_continued_fs
 
 end
+
+return htopography_load
