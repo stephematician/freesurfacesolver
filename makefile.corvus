@@ -1,0 +1,105 @@
+# Makefile for freesurface continuator project
+# For make on CORVUS, eResearch SA's now slightly old super-computer cluster.
+#
+# Builds the lua libraries required for free surface continuation
+# with integral methods based on GSL special functions
+#
+# Due to the nature of using CORVUS, I have elected to use a locally built
+# lua library
+#
+# Revision notes:
+# 
+# 1/3/2013   - Added in integrals_sbox
+#
+# 19/02/2013 - Changed to new layout of project, phased out wnl and 
+#              wnl_global (now done with MATLAB)
+
+.PHONY : clean corvus vector
+
+LUA_MODS := integrals_sbox_homotopy.so \
+  integrals_box_homotopy.so  integrals_box_cluster.so \
+  integrals_pressure_homotopy.so \
+  continuator.so
+
+LUA_INCLUDE_PATH = $(HOME)/lua-5.1.5/include
+
+LUA_MOD_LINK = g++ -O -shared -fpic
+LUA_MOD_COMPILE = g++ -O2 -fpic -c
+
+LIBS = $(shell echo "-L$(LD_LIBRARY_PATH)" | sed -e 's/:/ -L/g') -lgsl -lgslcblas -lm
+INCLUDE_GCC = $(shell echo "-I$(INCLUDE)" | sed -e 's/:/ -I/g') -I/home/users/swade/lua-5.1.5/include
+CFLAGS = $(INCLUDE_GCC) -D __VECTOR_USE_GSL -g
+
+corvus : LT_OEXT := .so.0.0.0
+corvus : LT_EXT := .so.0.0.0
+corvus : LT_PRE := lib
+corvus : LT_CEXT := .lo
+corvus : LT_OPRE := lib
+
+
+default :
+	@echo Type make corvus
+
+corvus : $(LUA_MODS)
+
+
+integrals_pressure_homotopy.so : integrals_pressure.o integrals_pressure_formulation.o vector integrals_pressure_homotopy.cpp 
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_pressure_homotopy$(LT_CEXT) integrals_pressure_homotopy.cpp
+	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_pressure_homotopy$(LT_EXT) integrals_pressure$(LT_CEXT) integrals_pressure_formulation$(LT_CEXT) integrals_pressure_homotopy$(LT_CEXT) vector$(LT_CEXT) $(LIBS)
+	mv $(LT_OPRE)integrals_pressure_homotopy$(LT_OEXT) integrals_pressure_homotopy.so
+
+integrals_pressure_formulation.o : integrals_pressure_formulation.cpp integrals_pressure_formulation.h vector
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_pressure_formulation$(LT_CEXT) integrals_pressure_formulation.cpp
+
+integrals_pressure.o : integrals_pressure.cpp integrals_pressure.h vector
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_pressure$(LT_CEXT) integrals_pressure.cpp
+
+integrals_box_cluster.so : integrals_box.o integrals_box_formulation.o vector integrals_box_cluster.cpp 
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_box_cluster$(LT_CEXT) integrals_box_cluster.cpp
+	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_box_cluster$(LT_EXT) integrals_box$(LT_CEXT) integrals_box_formulation$(LT_CEXT) integrals_box_cluster$(LT_CEXT) vector$(LT_CEXT) $(LIBS)
+	mv $(LT_OPRE)integrals_box_cluster$(LT_OEXT) integrals_box_cluster.so
+
+integrals_box_homotopy.so : integrals_box.o integrals_box_formulation.o vector integrals_box_homotopy.cpp 
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_box_homotopy$(LT_CEXT) integrals_box_homotopy.cpp
+	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_box_homotopy$(LT_EXT) integrals_box$(LT_CEXT) integrals_box_formulation$(LT_CEXT) integrals_box_homotopy$(LT_CEXT) vector$(LT_CEXT) $(LIBS)
+	mv $(LT_OPRE)integrals_box_homotopy$(LT_OEXT) integrals_box_homotopy.so
+
+integrals_box_formulation.o : integrals_box_formulation.cpp integrals_box_formulation.h vector.h
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_box_formulation$(LT_CEXT) integrals_box_formulation.cpp
+
+integrals_box.o : integrals_box.cpp integrals_box.h vector
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_box$(LT_CEXT) integrals_box.cpp
+
+integrals_box.so : integrals_box.cpp vector
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_box$(LT_CEXT) integrals_box.cpp
+	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_box$(LT_EXT) integrals_box$(LT_CEXT) vector$(LT_CEXT) $(LIBS)
+	mv $(LT_OPRE)integrals_box$(LT_OEXT) integrals_box.so
+
+integrals_sbox_homotopy.so : integrals_sbox.o integrals_sbox_formulation.o vector integrals_sbox_homotopy.cpp 
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_sbox_homotopy$(LT_CEXT) integrals_sbox_homotopy.cpp
+	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_sbox_homotopy$(LT_EXT) integrals_sbox$(LT_CEXT) integrals_sbox_formulation$(LT_CEXT) integrals_sbox_homotopy$(LT_CEXT) vector$(LT_CEXT) $(LIBS)
+	mv $(LT_OPRE)integrals_sbox_homotopy$(LT_OEXT) integrals_sbox_homotopy.so
+
+integrals_sbox_formulation.o : integrals_sbox_formulation.cpp integrals_sbox_formulation.h vector.h
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_sbox_formulation$(LT_CEXT) integrals_sbox_formulation.cpp
+
+integrals_sbox.o : integrals_box.cpp integrals_sbox.h vector
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_sbox$(LT_CEXT) integrals_sbox.cpp
+
+integrals_sbox.so : integrals_sbox.cpp vector
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o integrals_sbox$(LT_CEXT) integrals_sbox.cpp
+	$(LUA_MOD_LINK) -o $(LT_PRE)integrals_sbox$(LT_EXT) integrals_sbox$(LT_CEXT) vector$(LT_CEXT) $(LIBS)
+	mv $(LT_OPRE)integrals_sbox$(LT_OEXT) integrals_sbox.so
+
+continuator.so : continuator.cpp vector
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o continuator$(LT_CEXT) continuator.cpp
+	$(LUA_MOD_LINK) -o $(LT_PRE)continuator$(LT_EXT) continuator$(LT_CEXT) vector$(LT_CEXT) $(LIBS)
+	mv $(LT_OPRE)continuator$(LT_OEXT) continuator.so
+
+vector : vector.cpp
+	$(LUA_MOD_COMPILE) $(CFLAGS) -o vector$(LT_CEXT) vector.cpp
+
+clean :
+	rm -f .libs/*
+	rm -f *~
+	rm -f *.so *.lo *.la *.o
