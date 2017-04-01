@@ -18,9 +18,10 @@ upon value of u^2, and beta dependent on 1/u (averaged).
 
 Author   - Stephen Wade
 Created  - 07/12/2012
-Modified - 29/04/2014
+Modified - 11/08/2014
 
 History:
+11/08/2014 Added ability to 'restart' calculations.
 29/04/2014 In 'beta' phase, appears to function correctly for F=1.1, needs to
            be tried for F=1.11 - 1.30.
 09/01/2014 Adapted from gtopography_F110_B200.lua and new initialisation format
@@ -43,24 +44,29 @@ History:
 require "surface"
 require "htopography_residuals"
 require "htopography_grid"
+require "htopography_load"
 
-DO_US1 = true
+dofile('input/htopography_find_pert_to_unif.lua')
+dofile('input/htopography_find_doublelim_from_unif.lua')
+
+DO_US1 = false
 DO_US2 = true
-DO_DBL = true
+DO_DBL = false
+DO_DS2 = false
 
 EMAILME = false
-OVERWRITE = true
+OVERWRITE = false
 
 -- Grid
-N_HI_RES = 600
+N_HI_RES = 800
 N_LO_RES = 240
 
 CLUSTER_DPHI_VAL = 0.01
 
 -- Domain and topography
-L       = 2.00
+L       = 1.00
 B       = 10.00 -- ?
-FROUDE  = 1.15
+FROUDE  = 1.32
 PHI_LIM = 10
 
 round = function(x)
@@ -75,9 +81,10 @@ LSTR = string.format('%3u',round(L*100))
 
 -- Starting and finishing
 UNIFORM_A    = -0.04
-LIMIT_DBL_A  = 0.0005*L
+LIMIT_DBL_A  = -0.0005*L
 STOKES_U_MIN = 0.08
-LARGEST_AREA = 5.0
+LARGEST_AREA = 4.5
+SMALLEST_AREA = 0.005
 
 in_script_us   = 'input/htopography_uniform_init.lua'
 in_script_dbl  = 'input/htopography_double_init.lua'
@@ -85,14 +92,11 @@ in_script_dbl  = 'input/htopography_double_init.lua'
 out_file_us1 = 'output/htopography_F' .. FSTR .. '_US1_L' .. LSTR .. '.m'
 out_file_us2 = 'output/htopography_F' .. FSTR .. '_US2_L' .. LSTR .. '.m'
 out_file_dbl = 'output/htopography_F' .. FSTR .. '_DBL_L' .. LSTR .. '.m'
+out_file_ds2 = 'output/htopography_F' .. FSTR .. '_DS2_L' .. LSTR .. '.m'
 
 found_double = false
 
-if DO_US1 or DO_US2 then
-  dofile(in_script_us)
-end
-
---[[ Email notification sent when computation is completed. --]]
+-- Email notification sent when computation is completed.
 if EMAILME then
   require "luarocks.loader"
   smtp = require("socket.smtp")
@@ -109,7 +113,7 @@ mesgt = {
   headers = {
     to = "Stephen Wade <stephematician@gmail.com>",
     from = "Stephen Wade <stephen.wade@adelaide.edu.au>",
-    subject = "htopography calculation" 
+    subject = "htopography calculation, F = " .. FSTR .. ', L = ' .. LSTR 
   },
   body = "Body:\n\n" ..
          "Notes: homotopy available, symmetric formulation, with beta and " ..
@@ -119,6 +123,40 @@ mesgt = {
 
 if DO_US1 then
 
+of = io.open(out_file_us1, "r")
+
+if not of then
+  io.write('Creating : ' .. out_file_us1 .. '.\n')
+  io.flush()
+  dofile(in_script_us)
+  IN_SCRIPT_US = true
+  freesurface:create_file(out_file_us1)
+else
+  if OVERWRITE then
+    io.write('Deleting : ' .. out_file_us1 ..' ...')
+    io.flush()
+    of:close()
+    os.remove(out_file_us1)
+    io.write('done\n')
+    io.flush()
+    io.write('Creating : ' .. out_file_us1 .. '.\n')
+    io.flush()
+    dofile(in_script_us)
+    freesurface:create_file(out_file_us1)
+    IN_SCRIPT_US = true
+  else
+    io.write('Loading : ' .. out_file_us1 .. '.\n')
+    io.flush()
+              hi_res_unif,
+         free_hi_res_unif, 
+    continued_hi_res_unif = htopography_load.load_last(out_file_us1,
+                                                pert_to_unif_tables,
+                                                           N_HI_RES)
+    IN_SCRIPT_US = false
+  end
+end
+
+
 freesurface = surface.new(    hi_res_unif,
                          free_hi_res_unif,
                     continued_hi_res_unif,
@@ -126,31 +164,17 @@ freesurface = surface.new(    hi_res_unif,
   htopography_residuals.compute_output_hs)
 
 
---[[ Output file generation --]]
-
-of = io.open(out_file_us1, "r")
-
-if not of then
-   freesurface:create_file(out_file_us1)
-else
-  if OVERWRITE then
-    of:close()
-    os.remove(out_file_us1)
-    freesurface:create_file(out_file_us1) 
-  end
-end
-
 io.write('---------------------\n')
 io.write('Starting continuation\n')
 io.flush()
 
 freesurface:set_length_vars({'A', 'ETA0'})
 
-default_ds = 0.005 -- 0.05
+default_ds = 0.02 -- 0.02
 num_continuate = 600
 ds = default_ds
 
-stepsize = 0.01
+stepsize = 0.02
 max_stepsize = 2.5
 
 freesurface:set_max_stepsize(max_stepsize)
@@ -179,6 +203,7 @@ for i = 1, num_continuate, 1 do
 
   io.write('  Parameter summary :\n')  
   io.write('        A : ', csurf.A, '\n')
+  io.write('        D : ', csurf.D, '\n')
   io.write('     ETA0 : ', csurf.ETA0, '\n')
   io.write('    U_MIN : ', csurf.U_MIN, '\n')
   io.write('    PHI_C : ', csurf.PHI_C, '\n')
@@ -231,8 +256,8 @@ for i = 1, num_continuate, 1 do
   if is_double and csurf.A > LIMIT_DBL_A then
     found_double = true
     mesgt.body = mesgt.body .. 
-                'Finished first continuation branch at a double hump solution.\n' ..
-                'Took ' .. i .. ' iterations.\n'
+                 'Finished first continuation branch at a double hump solution.\n' ..
+                 'Took ' .. i .. ' iterations.\n'
     break
   end
 
@@ -290,23 +315,49 @@ Find the dip-like solutions? Then continue on to a pseudo-limiting configuration
 with large aspect ratio of disturbance?
 --]]
 
+of = io.open(out_file_us2, "r")
+
+if not of then
+  io.write('Creating : ' .. out_file_us2 .. '.\n')
+  io.flush()
+  if not IN_SCRIPT_US then
+    dofile(in_script_us)
+    IN_SCRIPT_US = true
+  end
+  freesurface:create_file(out_file_us2)
+else
+  if OVERWRITE then
+    io.write('Deleting : ' .. out_file_us2 ..' ...')
+    io.flush()
+    of:close()
+    os.remove(out_file_us2)
+    io.write('done\n')
+    io.flush()
+    io.write('Creating : ' .. out_file_us2 .. '.\n')
+    io.flush()
+    if not IN_SCRIPT_US then
+      dofile(in_script_us)
+      IN_SCRIPT_US = true
+    end
+    freesurface:create_file(out_file_us2)
+  else
+    io.write('Loading : ' .. out_file_us2 .. '.\n')
+    io.flush()
+              hi_res_unif,
+         free_hi_res_unif, 
+    continued_hi_res_unif = htopography_load.load_last(out_file_us2,
+                                                pert_to_unif_tables,
+                                                           N_HI_RES)
+    IN_SCRIPT_US = IN_SCRIPT_US or false
+  end
+end
+
+
 freesurface = surface.new(    hi_res_unif,
                          free_hi_res_unif,
                     continued_hi_res_unif,
         htopography_residuals.residual_hs,
   htopography_residuals.compute_output_hs)
-
-of = io.open(out_file_us2, "r")
-
-if not of then
-   freesurface:create_file(out_file_us2)
-else
-  if OVERWRITE then
-    of:close()
-    os.remove(out_file_us2)
-    freesurface:create_file(out_file_us2) 
-  end
-end
 
 io.write('---------------------\n')
 io.write('Starting continuation\n')
@@ -314,17 +365,17 @@ io.flush()
 
 freesurface:set_length_vars({'A', 'ETA0'})
 
-default_ds = 0.015
+default_ds = 0.05 -- 0.02
 num_continuate = 400
 ds = default_ds
 
-stepsize = 0.01
+stepsize = 0.02
 max_stepsize = 2.5
 
 freesurface:set_max_stepsize(max_stepsize)
 freesurface:set_stepsize(stepsize)
 
-direction = continuator.BACKWARD
+direction = continuator.FORWARD
 
 io.write('max iterations : ' .. tostring(num_continuate) .. '\n')
 io.write('     step size : ' .. tostring(stepsize) ..'\n')
@@ -425,15 +476,42 @@ end
 
 end -- if DO_US2
 
-print(mesgt.headers.subject)
-print(mesgt.body)
-
-io.flush()
-
 if DO_DBL then
 
 if not found_double then
-dofile(in_script_dbl)
+
+of = io.open(out_file_dbl, "r")
+
+if not of then
+  io.write('Creating : ' .. out_file_dbl .. '.\n')
+  io.flush()
+  dofile(in_script_dbl)
+  IN_SCRIPT_DBL = true
+  freesurface:create_file(out_file_dbl)
+else
+  if OVERWRITE then
+    io.write('Deleting : ' .. out_file_dbl ..' ...')
+    io.flush()
+    of:close()
+    os.remove(out_file_dbl)
+    io.write('done\n')
+    io.flush()
+    io.write('Creating : ' .. out_file_dbl .. '.\n')
+    io.flush()
+    dofile(in_script_dbl)
+    IN_SCRIPT_DBL = true
+    freesurface:create_file(out_file_dbl)
+  else
+    io.write('Loading : ' .. out_file_dbl .. '.\n')
+    io.flush()
+              hi_res_dbl,
+         free_hi_res_dbl, 
+    continued_hi_res_dbl = htopography_load.load_last(out_file_dbl,
+                                             pert_to_double_tables,
+                                                          N_HI_RES)
+  end
+end
+
 
 freesurface = surface.new(     hi_res_dbl,
                           free_hi_res_dbl,
@@ -443,18 +521,6 @@ freesurface = surface.new(     hi_res_dbl,
 
 --[[ Output file generation --]]
 
-of = io.open(out_file_dbl, "r")
-
-if not of then
-   freesurface:create_file(out_file_dbl)
-else
-  if OVERWRITE then
-    of:close()
-    os.remove(out_file_dbl)
-    freesurface:create_file(out_file_dbl) 
-  end
-end
-
 io.write('---------------------\n')
 io.write('Starting continuation\n')
 io.flush()
@@ -462,10 +528,10 @@ io.flush()
 freesurface:set_length_vars({'A', 'ETA0'})
 
 num_continuate = 400
-default_ds = 0.015
+default_ds = 0.05 -- 0.02
 ds = default_ds
 
-stepsize = 0.01
+stepsize = 0.01 -- 0.02
 max_stepsize = 2.5
 
 freesurface:set_max_stepsize(max_stepsize)
@@ -519,10 +585,8 @@ for i = 1, num_continuate, 1 do
   end
 
   if res == continuator.ERROR then
-    if EMAILME then
-      mesgt.body = mesgt.body .. 
-                   'Finished due to error in continuation method.\n'
-    end
+    mesgt.body = mesgt.body .. 
+                 'Finished due to error in continuation method.\n'
     error('Error detected in continuation.')
     break
   end
@@ -530,12 +594,9 @@ for i = 1, num_continuate, 1 do
   freesurface:append_file(out_file_dbl)
 
   if math.abs(csurf.A * csurf.L) > LARGEST_AREA then
-    if EMAILME then
-      mesgt.body = mesgt.body .. 
-                   'Finished doube-hump solutions with reasonably large trench.\n' ..
-                   'Took ' .. i .. ' iterations.\n'
-    end
-
+    mesgt.body = mesgt.body .. 
+                 'Finished doube-hump solutions with reasonably large trench.\n' ..
+                 'Took ' .. i .. ' iterations.\n'
     break
   end
 
@@ -587,6 +648,172 @@ end
 end -- if not found_double
 
 end -- if DO_DBL
+
+if DO_DS2 then
+
+of = io.open(out_file_ds2, "r")
+
+if not of then
+  io.write('Creating : ' .. out_file_ds2 .. '.\n')
+  io.flush()
+  if not IN_SCRIPT_DBL then
+    dofile(in_script_dbl)
+    IN_SCRIPT_DBL = true
+  end
+  freesurface:create_file(out_file_ds2)
+else
+  if OVERWRITE then
+    io.write('Deleting : ' .. out_file_ds2 ..' ...')
+    io.flush()
+    of:close()
+    os.remove(out_file_ds2)
+    io.write('done\n')
+    io.flush()
+    io.write('Creating : ' .. out_file_ds2 .. '.\n')
+    io.flush()
+    if not IN_SCRIPT_DBL then
+      dofile(in_script_dbl)
+      IN_SCRIPT_DBL = true
+    end
+    freesurface:create_file(out_file_ds2)
+  else
+    io.write('Loading : ' .. out_file_ds2 .. '.\n')
+    io.flush()
+              hi_res_dbl,
+         free_hi_res_dbl, 
+    continued_hi_res_dbl = htopography_load.load_last(out_file_ds2,
+                                             pert_to_double_tables,
+                                                          N_HI_RES)
+    IN_SCRIPT_DS = false
+  end
+end
+
+freesurface = surface.new(     hi_res_dbl,
+                          free_hi_res_dbl,
+                     continued_hi_res_dbl,
+        htopography_residuals.residual_hs,
+  htopography_residuals.compute_output_hs)
+
+io.write('---------------------\n')
+io.write('Starting continuation\n')
+io.flush()
+
+freesurface:set_length_vars({'A', 'FROUDE'})
+
+num_continuate = 400
+default_ds = 0.002 -- 0.015
+ds = default_ds
+
+stepsize = 0.002
+max_stepsize = 2.5
+
+freesurface:set_max_stepsize(max_stepsize)
+freesurface:set_stepsize(stepsize)
+
+direction = continuator.BACKWARD
+
+io.write('max iterations : ' .. tostring(num_continuate) .. '\n')
+io.write('     step size : ' .. tostring(stepsize) ..'\n')
+io.flush()
+
+initial_step = true
+res = nil
+
+for i = 1, num_continuate, 1 do
+  local outstr = 'Iteration : ' .. tostring(i-1)
+  local filstr = '-'
+  io.write(outstr .. '\n')
+  io.write(filstr:rep(outstr:len()) .. '\n')
+
+  local csurf = surface.unpack_vec(freesurface.unknowns,
+                                    freesurface.initial,
+                                    freesurface.is_free,
+                               freesurface.is_continued,
+                                  freesurface.ind_table)
+
+  io.write('  Parameter summary :\n')  
+  io.write('         A : ', csurf.A, '\n')
+  io.write('    FROUDE : ', csurf.FROUDE, '\n')
+  io.write('     U_MIN : ', csurf.U_MIN, '\n')
+  io.write('     PHI_C : ', csurf.PHI_C, '\n')
+  io.flush()
+
+  if res == continuator.BIFURCATION then
+    io.write('  Bifurcation detected.\n')
+    io.flush()
+    if direction == continuator.FORWARD then
+      direction = continuator.BACKWARD
+    else
+      direction = continuator.FORWARD
+    end
+    
+  end
+
+  if res == continuator.DIVERGED then
+    mesgt.body = mesgt.body .. 
+                 'Finished due to lack of convergence in continuation method.\n'
+    io.write('  Divergence in continuation.\n')
+    io.flush()
+    break
+  end
+
+  if res == continuator.ERROR then
+    mesgt.body = mesgt.body .. 
+                 'Finished due to error in continuation method.\n'
+    error('Error detected in continuation.')
+    break
+  end
+
+  freesurface:append_file(out_file_ds2)
+
+  if ((math.abs(csurf.A * csurf.L) > LARGEST_AREA) or
+      (math.abs(csurf.A * csurf.L) < SMALLEST_AREA)) and
+     (not initial_step) then
+      mesgt.body = mesgt.body .. 
+                   'Finished doube-hump solutions with reasonably large trench.\n' ..
+                   'Took ' .. i .. ' iterations.\n'
+    break
+  end
+
+  local progress_start = os.clock()
+  res, msg = freesurface:progress_interp(ds, direction, freesurface)
+  local progress_finish = os.clock()
+  io.write(msg)
+  io.write('    Continuation time = ' .. tostring(progress_finish - progress_start) ..'\n')
+  io.flush()
+
+  if initial_step then
+    local nsurf = surface.unpack_vec(freesurface.unknowns,
+                                      freesurface.initial,
+                                      freesurface.is_free,
+                                  freesurface.is_continued,
+                                     freesurface.ind_table)
+
+    if nsurf.A < csurf.A then
+      freesurface:reset_interp()
+      io.write('  Started in wrong direction, attempting to switch.\n')
+      if direction == continuator.FORWARD then
+        direction = continuator.BACKWARD
+      else
+        direction = continuator.FORWARD
+      end
+    else
+      initial_step = false
+    end
+  else
+    local regrid_start = os.clock()
+    freesurface, direction = htopography_grid.regrid_hs(freesurface)
+    local regrid_finish = os.clock()
+    io.write('    Regrid time = ' .. tostring(regrid_finish - regrid_start) .. '\n')
+    io.flush()
+  end
+
+  collectgarbage("collect")
+
+end
+
+end -- if DO_DS2
+
 
 io.write('Finished continuation for all solutions.\n')
 io.flush()

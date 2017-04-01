@@ -6,3 +6,7 @@ output/*
 html/*
 *.swp
 ./*.m
+lib
+bin
+legacy
+.svn
