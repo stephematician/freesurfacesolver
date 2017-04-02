@@ -1,5 +1,5 @@
-require "htopography_residuals"
-require "grid_functions"
+local htopography_residuals = require "htopography_residuals"
+local grid_functions        = require "grid_functions"
 
 local htopography_grid = {}
 

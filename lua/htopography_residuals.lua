@@ -1,6 +1,6 @@
-require "surface"
-require "integrals_sbox_homotopy"
-require "grid_functions"
+local surface        = require "surface"
+local integrals_sbox = require "integrals_sbox_homotopy"
+local grid_functions = require "grid_functions"
 
 local htopography_residuals = {}
 

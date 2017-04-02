@@ -1,0 +1,5 @@
+-- Script only tested on Debian/Ubuntu
+package.path  = package.path .. ';./lua/?.lua'
+package.cpath = package.cpath .. ';./lib/?.so'
+
+

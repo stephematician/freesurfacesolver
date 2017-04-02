@@ -17,8 +17,17 @@ extern luaL_Reg integralsR[];
 
 int luaopen_integrals_sbox(lua_State *L) {
   /* Create userdata with the gsl_integration_workspace */
-  luaL_setfuncs(L, integralsR, 0);
-  
+  lua_newtable(L);
+
+  const luaL_Reg* fs = integralsR;
+
+  while(fs->name) {
+    lua_pushstring(L, fs->name);
+    lua_pushcfunction(L, fs->func);
+    lua_settable(L, -3);
+    ++fs;
+  }
+
   /** \todo Fix which name to use for the gsl_integration_workspace registry 'key' */
   lua_pushstring(L, integrals_lualib_regkey);
   // Make new userdata at the top of the stack

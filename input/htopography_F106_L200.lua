@@ -18,9 +18,10 @@ upon value of u^2, and beta dependent on 1/u (averaged).
 
 Author   - Stephen Wade
 Created  - 07/12/2012
-Modified - 11/08/2014
+Modified - 02/04/2017
 
 History:
+02/04/2017 New directory structure and Lua 5.2 changes
 11/08/2014 Added ability to 'restart' calculations.
 29/04/2014 In 'beta' phase, appears to function correctly for F=1.1, needs to
            be tried for F=1.11 - 1.30.
@@ -41,16 +42,18 @@ History:
 07/12/2012 Created original script.
 --]]
 
-require "surface"
-require "htopography_residuals"
-require "htopography_grid"
-require "htopography_load"
+dofile('lua/configure.lua')
+
+surface               = require "surface"
+htopography_residuals = require "htopography_residuals"
+htopography_grid      = require "htopography_grid"
+htopography_load      = require "htopography_load"
 
 dofile('input/htopography_find_pert_to_unif.lua')
 dofile('input/htopography_find_doublelim_from_unif.lua')
 
 DO_US1 = true
-DO_US2 = true 
+DO_US2 = true
 DO_DBL = true
 DO_DS2 = true
 

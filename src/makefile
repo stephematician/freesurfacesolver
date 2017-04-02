@@ -21,13 +21,13 @@ $(LIB_DIR)/integrals_pressure_homotopy.so : \
 	    $(GSL_LIBS)
 	mv $(LIB_DIR)/$(LT_OPRE)integrals_pressure_homotopy$(LT_OEXT) $@
 
-$(OBJ_DIR)/integrals_pressure_formulation.o : \
+$(OBJ_DIR)/integrals_pressure_formulation$(LT_CEXT) : \
     integrals_pressure_formulation.cpp \
     $(INCLUDE_DIR)/integrals_pressure_formulation.h \
     $(INCLUDE_DIR)/vector.h
 	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_pressure_formulation.cpp -o $@
 
-$(OBJ_DIR)/integrals_pressure.o : \
+$(OBJ_DIR)/integrals_pressure$(LT_CEXT) : \
     integrals_pressure.cpp \
     $(INCLUDE_DIR)/integrals_pressure.h \
     $(INCLUDE_DIR)/vector.h
@@ -72,7 +72,7 @@ $(LIB_DIR)/continuator.so : continuator.cpp $(OBJ_DIR)/vector$(LT_CEXT)
 	    $(GSL_LIBS)
 	mv $(LIB_DIR)/$(LT_OPRE)continuator$(LT_OEXT) $@
 
-memtest : memtest.c
+$(BIN_DIR)/memtest : memtest.c
 	$(CXX) $(CFLAGS) -c -o $(OBJ_DIR)/memtest.o memtest.c
 	$(CXX) -o $(BIN_DIR)/memtest $(OBJ_DIR)/memtest.o $(LUA_LIBS)
 

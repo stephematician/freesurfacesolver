@@ -49,15 +49,17 @@ static void add_constants(lua_State *L, struct lua_constant *cn)
 }
 
 int luaopen_continuator(lua_State *L) {
+
   int NARG = lua_gettop(L);
-  luaL_setfuncs(L, continuatorR, 0);
-  
+
+  luaL_newlib(L, continuatorR);
   add_constants(L, continuator_constants);
-  
+
   if(lua_gettop(L) != NARG+1) {
     lua_pushstring(L, "luaopen_continuator_cpp exit");
     lua_error(L);
   }
+
   return 1;
 }
 

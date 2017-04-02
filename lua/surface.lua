@@ -8,11 +8,9 @@
   Last modified : 6/2/2013
 ]]--
 
-require "continuator"
+continuator = require 'continuator'
 
 local surface = {}
-
-module("surface", package.seeall)
 
 local dcopy
 local create_file
@@ -627,7 +625,7 @@ append_file = function(filename,
                         is_free,
                    is_continued,
                       ind_table,
-                 compute_output),
+                 compute_output)
 
   of = io.open(filename, "r+")
 

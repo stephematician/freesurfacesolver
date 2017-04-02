@@ -46,11 +46,11 @@ linux : LUA_MOD_COMPILE = libtool --tag=CXX --mode=compile g++ -c -shared
 macosx : LUA_MOD_LINK = $(CXX) -bundle -undefined dynamic_lookup
 macosx : LUA_MOD_COMPILE = $(CXX) -fPIC -c
 
-LIBS = $(LUA_LIBS) $(GSL_LIBS)
 CFLAGS = -I$(INCLUDE_DIR) $(LUA_CFLAGS) $(GSL_CFLAGS) -D __VECTOR_USE_GSL
 
+export LUA_LIBS GSL_LIBS
 export LT_OEXT LT_EXT LT_CEXT LT_PRE LT_OPRE
-export CFLAGS LIBS INCLUDE_DIR OBJ_DIR LIB_DIR BIN_DIR
+export CFLAGS INCLUDE_DIR OBJ_DIR LIB_DIR BIN_DIR
 export LUA_MOD_COMPILE LUA_MOD_LINK
 
 .PHONY: clean linux macosx checks
