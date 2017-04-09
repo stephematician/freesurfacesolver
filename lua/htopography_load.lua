@@ -85,7 +85,7 @@ htopography_load.load_last = function(file_name, init_tables_fn, hi_res_n)
       assert(type(v) == "table", "output data not in correct format")
       if not (k == "THETA_S") then
         assert(not (input_fs[k] == nil), "Could not find corresponding old data for " .. k)
-        initial_fs[k] = htopography_grid.deepcopy(input_fs[k])
+        initial_fs[k] = htopography_grid.dcopy(input_fs[k])
       end
     end
   end

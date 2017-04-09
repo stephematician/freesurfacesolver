@@ -8,7 +8,7 @@ local grid_functions = {}
      important about how it relates to the choice of dphi.
 
 ]]--
-grid_functions.calculate_beta = function(n_sub)
+local calculate_beta = function(n_sub)
   local beta = {}
 
   local k = 1
@@ -22,7 +22,6 @@ grid_functions.calculate_beta = function(n_sub)
 
   return beta
 end
-
 
 --[[ Interpolate theta using cubic spline interpolation.
 
@@ -38,7 +37,7 @@ end
     that #f == #phi.
 
 --]]
-grid_functions.interp_cubic = function(phi, f, nphi)
+local interp_cubic = function(phi, f, nphi)
   local b = 0
   local nf = {}
 
@@ -487,5 +486,8 @@ grid_functions.convert_grid_hs = function(phi, theta, tau_mid, n, cluster_coeff,
   return ntheta, nbeta_sub, nn_sub, nphi_sub, ndphi_sub
 
 end
+
+grid_functions.interp_cubic = interp_cubic
+grid_functions.calculate_beta = calculate_beta
 
 return grid_functions

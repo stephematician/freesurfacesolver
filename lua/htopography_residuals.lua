@@ -18,7 +18,7 @@ local bernoulli = function(tau, eta, froude)
   return val
 end
 
-htopography_residuals.compute_bttxe_hs = function(unpacked, x_calculation)
+local compute_bttxe_hs = function(unpacked, x_calculation)
 
   -- Theta on free surface
   local theta_s    = unpacked.THETA_S
@@ -315,11 +315,11 @@ htopography_residuals.compute_output_hs = function(unpacked)
   
 end
 
-unit_clamp = function(g)
+local unit_clamp = function(g)
   return math.max(math.min(g,1), 0)
 end
 
-residual_hs = function(unknowns, extra)
+htopography_residuals.residual_hs = function(unknowns, extra)
   local fs = extra[1]
 
   if print_out then
@@ -508,5 +508,7 @@ residual_hs = function(unknowns, extra)
   
   return val
 end
+
+htopography_residuals.compute_bttxe_hs = compute_bttxe_hs
 
 return htopography_residuals

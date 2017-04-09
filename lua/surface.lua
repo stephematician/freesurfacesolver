@@ -56,8 +56,7 @@ surface.new = function(in_initial,
                 in_surface.compute_output)
   end
 
-  r_table.create_file =
-  function(in_surface, filename)
+  r_table.create_file = function(in_surface, filename)
     create_file(filename)
   end
   
@@ -70,7 +69,7 @@ surface.new = function(in_initial,
     c, t, pr = in_surface.pcc:progress(in_surface.unknowns,
                                         in_surface.tangent,
                                       in_surface.direction,
-                                                       arg)
+                                                     {...})
     for k, v in pairs(c) do
       in_surface.unknowns[k] = v
     end
@@ -524,7 +523,7 @@ pack_vec = function(current, is_free, is_continued)
   
 end
 
-surface.unpack_vec = function(packed, initial, is_free, is_continued, ind_table)
+local unpack_vec = function(packed, initial, is_free, is_continued, ind_table)
 --[[ Comment?
 --]]
   current = {}
@@ -689,5 +688,7 @@ append_file = function(filename,
   of:close()
 
 end
+
+surface.unpack_vec = unpack_vec
 
 return surface

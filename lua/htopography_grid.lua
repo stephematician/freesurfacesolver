@@ -3,11 +3,9 @@ local grid_functions        = require "grid_functions"
 
 local htopography_grid = {}
 
-local dcopy
-
 -- Okay this has literally *one* change from gtopography_grid ... maybe I need to fix this structure.
 
-dcopy = function(object)
+local dcopy = function(object)
   local lookup_table = {}
   local function _copy(object)
     if type(object) ~= "table" then
@@ -25,6 +23,7 @@ dcopy = function(object)
   return _copy(object)
 end
 
+
 htopography_grid.regrid_hs = function(insurf)
 
   local initial_surf = surface.unpack_vec(insurf.unknowns,
@@ -34,10 +33,10 @@ htopography_grid.regrid_hs = function(insurf)
                                          insurf.ind_table)
 
 
-  local is_free_surf = deepcopy(insurf.is_free)
-  local is_continued_surf = deepcopy(insurf.is_continued)
+  local is_free_surf = dcopy(insurf.is_free)
+  local is_continued_surf = dcopy(insurf.is_continued)
   
-  local oldN_SUB = deepcopy(initial_surf.N_SUB)
+  local oldN_SUB = dcopy(initial_surf.N_SUB)
 
   local inN = #(initial_surf.THETA_S)
   local inCLUSTER_DPHI_VAL = initial_surf.CLUSTER_VAL
@@ -196,5 +195,7 @@ htopography_grid.regrid_hs = function(insurf)
   end
 
 end
+
+htopography_grid.dcopy = dcopy
 
 return htopography_grid

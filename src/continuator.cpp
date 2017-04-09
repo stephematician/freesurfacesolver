@@ -118,7 +118,7 @@ prog_result PCcontinuator::progress(const vector &x0,
   matrix Q       = matrix(n, n, &(heap_m[m*n*2]));
 
   H(x0, y0, args);
-    
+
   for(unsigned int i = 1; i <= n; i++) x1(i) = x0(i);
   /*real max_jac = -INFINITY;
   int max_jac_i, max_jac_j;*/
@@ -288,9 +288,7 @@ prog_result PCcontinuator::newton(const vector &x0,
   matrix R       = matrix(n, n, &(heap_m[n*n]));
   matrix Q       = matrix(n, n, &(heap_m[n*n*2]));
   
-  printf("Lua continuation proglayer call\n");
   H(x0, y0, args);
-  printf("Lua continuation proglayer success\n");
     
   for(unsigned int i = 1; i <= n; i++) soln(i) = x0(i);
       
@@ -299,7 +297,7 @@ prog_result PCcontinuator::newton(const vector &x0,
       progress_diverged = true;
       break;
     }
-    printf("Lua continuation newton iteration\n");
+    
     for(unsigned int i = 1; i <= n; i++) x1(i) = soln(i);
 
     /* Calculate the Jacobian of the system at x0 */
@@ -338,7 +336,6 @@ prog_result PCcontinuator::newton(const vector &x0,
 
     for(unsigned int i = 1; i <= n; i++)  soln(i) += dx(i);
     
-    printf("Lua continuation newton step complete");
     /*printf(", here's x0 and y0\n");
     printf("x0 =");
     for(unsigned int i = 1; i <= n; i++) {
@@ -436,7 +433,6 @@ int lua_continuator_new(lua_State* L)
   void* buffer = lua_newuserdata(L, sizeof(PCcontinuator));
   
   PCcontinuator* nc = new(buffer) PCcontinuator(lua_continuator_proglayer);
-  
 
   lua_newtable(L);   // Make new metatable for PCcontinuator
   
@@ -481,6 +477,7 @@ void lua_continuator_proglayer(const vector& input, vector& output, void* args)
   for(unsigned int i = 2; i <= NARG; i++) {
     lua_pushvalue(L, i);
   }
+
   lua_call(L, NARG, 1);
 
   output = veclua_tovector(L, -1);
@@ -560,9 +557,8 @@ int lua_continuator_progress(lua_State* L)
   lua_remove(L, 3);
   lua_remove(L, 2);
   lua_remove(L, 1);
-  
+
   lua_insert(L, 1);
-  
   prog_result pr = pcc->progress(x, o, t, (void*)L, dir);
   
   if(NARG-3 != lua_gettop(L)) {
@@ -592,7 +588,6 @@ int lua_continuator_newton(lua_State* L)
     lua_pushstring(L, "lua_continuator_newton entry");
     lua_error(L);
   }
-  printf("Lua continuation newton entry point\n");
 
   lua_pushstring(L, "ud");
   lua_rawget(L, 1);
@@ -611,7 +606,6 @@ int lua_continuator_newton(lua_State* L)
   
   lua_insert(L, 1);
   
-  printf("Lua continuation pcc newton call\n");
   prog_result pr = pcc->newton(x, o, (void*)L);
   
   if(NARG-1 != lua_gettop(L)) {
