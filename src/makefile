@@ -77,3 +77,8 @@ $(BIN_DIR)/memtest : memtest.c
 	$(CXX) -o $(BIN_DIR)/memtest $(OBJ_DIR)/memtest.o $(LUA_LIBS)
 
 
+clean:
+	rm -rf $(LIB_DIR)
+	rm -rf $(BIN_DIR)
+	rm -rf $(OBJ_DIR)
+

@@ -5,8 +5,10 @@
 #
 # Revision notes:
 #
-# 1/3/2013 Phased out wnl and wnl_global, phasing out integrals_hfall, and integrals_triangle.
-# 1/4/2017 Phased out integrals_hfall, integrals_box and integrals_triangle
+# 1/3/2013  Phased out wnl and wnl_global, phasing out integrals_hfall, and
+#     integrals_triangle.
+# 1/4/2017  Phased out integrals_hfall, integrals_box and integrals_triangle
+# 12/4/2017 Updated clean procedure
 
 linux : LUA_NAME := lua5.2
 macosx : LUA_NAME := lua
@@ -56,7 +58,7 @@ export LUA_MOD_COMPILE LUA_MOD_LINK
 .PHONY: clean linux macosx checks
 
 default :
-	@echo Choose make linux, macosx.
+	@echo Choose make linux, macosx or clean
 
 linux : checks
 	cd src && $(MAKE) $@
@@ -74,6 +76,5 @@ checks :
 
 clean :
 	cd src/ && $(MAKE) clean
-	rm -f html/*
-	rm -f .libs/*
-	rm -f *.so *.lo *.la *.o
+	rm -rf html
+
