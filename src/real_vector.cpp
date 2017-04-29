@@ -1,11 +1,11 @@
-/** \file vector.cpp
+/** \file real_vector.cpp
 
   Contains friend functions of the vector and matrix classes
 */
 
-#include "vector.h"
-#include <math.h>
-#include <stdio.h>
+#include "real_vector.h"
+#include <cmath>
+#include <memory>
 
 #ifdef __VECTOR_USE_GSL
   #include <gsl/gsl_linalg.h>
@@ -16,80 +16,77 @@
 
 real empty_vec = 0.0;
 
-int solve_lin_mat(const matrix& A, vector& x, const vector& b)
+int solve_lin_mat(const real_matrix& A, real_vector& x, const real_vector& b)
 {
-  unsigned int m = A.rows();
-  unsigned int n = A.cols();
+    const unsigned int m = A.rows();
+    const unsigned int n = A.cols();
+
 #ifdef __VECTOR_USE_GSL
-  unsigned int k = m < n ? n : m;
 
-  real* heap_m = new real[(n*n)+(k*n)];
-  real* heap_v = new real[n+k+k];
+    const unsigned int k = m < n ? n : m;
 
-  matrix U  = matrix(k, n, &(heap_m[0]));
-  matrix V  = matrix(n, n, &(heap_m[k*n]));
-  vector s  = vector(n, &(heap_v[0]));
-  vector w  = vector(k, &(heap_v[n]));
-  vector b0 = vector(k, &(heap_v[n+k]));
+    const std::unique_ptr<real[]> heap_m(new real[(n*n)+(k*n)]);
+    const std::unique_ptr<real[]> heap_v(new real[n+(2*k)]);
 
-  for(unsigned int i = 1; i <= k; i++) {
-    if(i > m) {
-      b0(i) = 0;
-      for(unsigned int j = 1; j <= n; j++) U(i,j) = 0;
-    } else {
-      b0(i) = b(i);
-      for(unsigned int j = 1; j <= n; j++) U(i,j) = A(i,j);
+    real_matrix U(k, n, &(heap_m[0]));
+    real_matrix V(n, n, &(heap_m[k*n]));
+    real_vector s(n, &(heap_v[0]));
+    real_vector w(k, &(heap_v[n]));
+    real_vector b0(k, &(heap_v[n+k]));
+
+    for(unsigned int i = 1; i <= k; i++) {
+        if(i > m) {
+            b0(i) = 0;
+            for(unsigned int j = 1; j <= n; j++) U(i,j) = 0;
+        } else {
+            b0(i) = b(i);
+            for(unsigned int j = 1; j <= n; j++) U(i,j) = A(i,j);
+        }
     }
-  }
 
-  gsl_linalg_SV_decomp(U.gsl(), V.gsl(), s.gsl(), w.gsl());
-  gsl_linalg_SV_solve(U.gsl(), V.gsl(), s.gsl(), b0.gsl(), x.gsl());
-
-  delete [] heap_m;
-  delete [] heap_v;
+    gsl_linalg_SV_decomp(U.gsl(), V.gsl(), s.gsl(), w.gsl());
+    gsl_linalg_SV_solve(U.gsl(), V.gsl(), s.gsl(), b0.gsl(), x.gsl());
 
 #else
-  /* Heap for matrices needed
-     name    size
-     R       (m,n)
-     Q       (m,m)
-  */
-  real *heap_m = new real[(m*n)+(m*m)];
-  /* Heap for vectors needed
-     name   size
-     y      (m)
-  */
-  real *heap_v = new real[m];
 
-  vector y = vector(m,&(heap_v[0]));
+    /* Heap for matrices needed
+     * name    size
+     * R       (m,n)
+     * Q       (m,m) */
+    const std::unique_ptr<real[]> heap_m(new real[(m*n)+(m*m)]);
+    /* Heap for vectors needed
+     * name   size
+     * y      (m) */
+    const std::unique_ptr<real[]> heap_v(new real[m]);
 
-  matrix Q = matrix(m,m,&(heap_m[0]));
-  matrix R = matrix(m,n,&(heap_m[m*m]));
+    real_vector y(m,&(heap_v[0]));
 
-  qr_givens(A, Q, R);
+    real_matrix Q(m,m,&(heap_m[0]));
+    real_matrix R(m,n,&(heap_m[m*m]));
 
-  /* Matrix multiplication y = Q'b */
-  for(unsigned int i = 1; i <= m; i++) {
-    y(i) = 0.0;
-    for(unsigned int j = 1; j <= m; j++) y(i) += Q(j,i) * b(j);
-  }
+    qr_givens(A, Q, R);
 
-  for(unsigned int i = m+1; i <= n; i++) x(i) = 0.0;
-
-  /* Use back substitution Rx = y */
-  for(unsigned int i = m; i >= 1; i--) {
-    if(i <= n) {
-      x(i) = y(i);
-      for(unsigned int j = i+1; j <= n; j++) x(i) -= R(i,j) * x(j);
-      x(i) /= R(i,i);
+    /* Matrix multiplication y = Q'b */
+    for(unsigned int i = 1; i <= m; i++) {
+        y(i) = 0.0;
+        for(unsigned int j = 1; j <= m; j++) y(i) += Q(j,i) * b(j);
     }
-  }
 
-  delete [] heap_m;
-  delete [] heap_v;
+    for(unsigned int i = m+1; i <= n; i++) x(i) = 0.0;
+
+    /* Use back substitution Rx = y */
+    for(unsigned int i = m; i >= 1; i--) {
+        if(i <= n) {
+            x(i) = y(i);
+            for(unsigned int j = i+1; j <= n; j++) x(i) -= R(i,j) * x(j);
+            x(i) /= R(i,i);
+        }
+    }
+
 #endif
 
-  return 0;
+    return 0;
+
 }
 
 /** Perform QR factorisation
@@ -100,107 +97,158 @@ int solve_lin_mat(const matrix& A, vector& x, const vector& b)
 
   Uses Givens rotations to calculate the QR factorisation of a matrix.
 */
-int qr_givens(const matrix &A, matrix &Q, matrix &R)
+int qr_givens(const real_matrix &A, real_matrix &Q, real_matrix &R)
 {
-  unsigned int m = A.rows();
-  unsigned int n = A.cols();
+    const unsigned int m = A.rows();
+    const unsigned int n = A.cols();
 
 #ifdef __VECTOR_USE_GSL
-  unsigned int k = m < n ? m : n;
+    const unsigned int k = m < n ? m : n;
 
-  real* heap_v = new real[k];
-  real* heap_m = new real[m*n];
+    const std::unique_ptr<real[]> heap_v(new real[k]);
+    const std::unique_ptr<real[]> heap_m(new real[m*n]);
 
-  matrix QR  = matrix(m, n, &(heap_m[0]));
-  vector tau = vector(k, &(heap_v[0]));
+    real_matrix QR(m, n, &(heap_m[0]));
+    real_vector tau(k, &(heap_v[0]));
 
-  for(unsigned int i = 1; i <= m; i++) {
-    for(unsigned int j = 1; j <= n; j++) {
-      QR(i,j) = A(i,j);
+    for(unsigned int i = 1; i <= m; i++) {
+        for(unsigned int j = 1; j <= n; j++) QR(i,j) = A(i,j);
     }
-  }
 
-  gsl_linalg_QR_decomp(QR.gsl(), tau.gsl());
-  gsl_linalg_QR_unpack(QR.gsl(), tau.gsl(), Q.gsl(), R.gsl());
-
-  delete [] heap_v;
-  delete [] heap_m;
+    gsl_linalg_QR_decomp(QR.gsl(), tau.gsl());
+    gsl_linalg_QR_unpack(QR.gsl(), tau.gsl(), Q.gsl(), R.gsl());
 
 #else
-  real a, b, t, u;
-  real c, s, r1, r2, q1, q2;
 
-  for(unsigned int i = 1; i <= m; i++) {
-    for(unsigned int j = 1; j <= n; j++) R(i,j) = A(i,j);
-    for(unsigned int j = 1; j <= m; j++) Q(i,j) = 0.0;
-  }
-
-  for(unsigned int i = 1; i <= m; i++) Q(i,i) = 1.0;
-
-  for(unsigned int i = 1; i <= m; i++) {
-    for(unsigned int k = i+1; k <= m; k++) {
-      a = R(i,i);
-      b = R(k,i);
-      if(b != 0.0) {
-        if(a == 0.0) {
-          c = 0.0;
-          s = rsign(b);
-        } else if(fabs(b) > fabs(a)) {
-          t = a / b;
-          u = rsign(b) * sqrt(1.0+(t*t));
-          s = 1.0 / u;
-          c = s * t;
-        } else {
-          t = b / a;
-          u = rsign(a) * sqrt(1.0+(t*t));
-          c = 1.0 / u;
-          s = c * t;
-        }
-        for(unsigned int j = 1; j <= n; j++) {
-          r1 = R(i,j);
-          r2 = R(k,j);
-          R(i,j) = (c * r1) + (s * r2);
-          R(k,j) = (c * r2) - (s * r1);
-        }
-        for(unsigned int j = 1; j <= m; j++) {
-          q1 = Q(i,j);
-          q2 = Q(k,j);
-          Q(i,j) = (c * q1) + (s * q2);
-          Q(k,j) = (c * q2) - (s * q1);
-        }
-      } 
+    for(unsigned int i = 1; i <= m; i++) {
+        for(unsigned int j = 1; j <= n; j++) R(i,j) = A(i,j);
+        for(unsigned int j = 1; j <= m; j++) Q(i,j) = 0.0;
     }
-  }
 
-  // Q = Q'
-  for(unsigned int i = 1; i <= m; i++) {
-    for(unsigned int j = i+1; j <= m; j++) {
-      t = Q(i,j);
-      Q(i,j) = Q(j,i);
-      Q(j,i) = t;
+    for(unsigned int i = 1; i <= m; i++) Q(i,i) = 1.0;
+
+    for(unsigned int i = 1; i <= m; i++) {
+
+        for(unsigned int k = i+1; k <= m; k++) {
+
+            const real a = R(i,i);
+            const real b = R(k,i);
+
+            if(b != 0.0) {
+                real c, s;
+
+                if(a == 0.0) {
+                    c = 0.0;
+                    s = rsign(b);
+                } else if(fabs(b) > fabs(a)) {
+                    const real t = a / b;
+                    const real u = rsign(b) * sqrt(1.0+(t*t));
+                    s = 1.0 / u;
+                    c = s * t;
+                } else {
+                    const real t = b / a;
+                    const real u = rsign(a) * sqrt(1.0+(t*t));
+                    c = 1.0 / u;
+                    s = c * t;
+                }
+
+                for(unsigned int j = 1; j <= n; j++) {
+                    const real r1 = R(i,j);
+                    const real r2 = R(k,j);
+                    R(i,j) = (c * r1) + (s * r2);
+                    R(k,j) = (c * r2) - (s * r1);
+                }
+
+                for(unsigned int j = 1; j <= m; j++) {
+                    const real q1 = Q(i,j);
+                    const real q2 = Q(k,j);
+                    Q(i,j) = (c * q1) + (s * q2);
+                    Q(k,j) = (c * q2) - (s * q1);
+                }
+
+            } 
+        }
     }
-  }
+
+    // Q = Q'
+    for(unsigned int i = 1; i <= m; i++) {
+        for(unsigned int j = i+1; j <= m; j++) {
+            const real t = Q(i,j);
+            Q(i,j) = Q(j,i);
+            Q(j,i) = t;
+        }
+    }
+
 #endif
+
 }
 
-void veclua_pushtable(lua_State* L, const vector& v)
-{
-  int NARG = lua_gettop(L);
-  
-  lua_checkstack(L, lua_gettop(L)+3);
+void veclua_pushtable(lua_State* L, const real_vector& v) {
 
-  lua_newtable(L);
+    const int NARG = lua_gettop(L);
+
+    lua_checkstack(L, 3);
+
+    lua_newtable(L);
   
-  for(unsigned int i = 1; i <= v.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, v(i));
-    lua_rawset(L, -3);
-  }
-  if(lua_gettop(L) != NARG+1) {
-    lua_pushstring(L, "veclua_pushtable exit");
-    lua_error(L);
-  }
-  return;
+    for(unsigned int i = 1; i <= v.length(); i++) {
+        lua_pushnumber(L, i);
+        lua_pushnumber(L, v(i));
+        lua_rawset(L, -3);
+    }
+
+    if(lua_gettop(L) != NARG+1) {
+        lua_pushstring(L, "pushtable() failed stack-size exit condition.");
+        lua_error(L);
+    }
+
+    return;
+
+}
+
+int veclua_veclength(lua_State* L,
+                     const int index) {
+
+    const int NARG = lua_gettop(L);
+
+    lua_checkstack(L, 2);
+
+    int m = 0;
+
+    switch(lua_type(L, index)) {
+        case LUA_TNUMBER:
+            if(lua_gettop(L) != NARG) {
+                lua_pushstring(L,
+                               "veclua_veclength() failed stack-size exit "
+                               "condition.");
+                lua_error(L);
+            }
+            return 1;
+        case LUA_TTABLE:
+            lua_pushnil(L);
+            while(lua_next(L, (index > 0) ? index : index-1)) {
+                if(lua_type(L, index) != LUA_TNUMBER &&
+                        lua_tonumber(L, 1) == m + 1) {
+                    lua_pop(L, 1);
+                    lua_pushstring(L,
+                                   "veclua_veclength() requires vector stored "
+                                   "with consecutive integer indices from 1 "
+                                   "to n.");
+                    lua_error(L);
+                }
+                m++;
+                lua_pop(L, 1);
+            }
+            if(lua_gettop(L) != NARG) {
+                lua_pushstring(L,
+                               "veclua_veclength() failed stack-size exit "
+                               "condition.");
+                lua_error(L);
+            }
+            return m;
+        default:
+            return 0;
+    }
 }
 
 /** Makes a vector object from a table on the top of the stack
@@ -217,52 +265,36 @@ table.
 The Lua stack will remained unchanged, aside from possible resizing to
 accomodate iteration over a Lua table.
 */
-vector veclua_tovector(lua_State*    L, /**< The Lua context/stack */
-                       const int index  /**< The index into Lua stack*/)
-{
-  int NARG = lua_gettop(L);
-
-  lua_checkstack(L, lua_gettop(L)+2);
+void veclua_tovector(lua_State*    L, /**< The Lua context/stack */
+                     const int index, /**< The index into Lua stack */
+                     real_vector&  v  /**< Vector to modify */) {
   
-  switch(lua_type(L, index)) {
-  case LUA_TNUMBER : {
-    vector v(1);
-    v(1) = lua_tonumber(L, index);
-    if(lua_gettop(L) != NARG) {
-      lua_pushstring(L, "veclua_tovector exit");
-      lua_error(L);
+    const int NARG = lua_gettop(L);
+
+    lua_checkstack(L, 2);
+
+    int i = 0;
+  
+    switch(lua_type(L, index)) {
+        case LUA_TNUMBER:
+            v(1) = lua_tonumber(L, index);
+            return;
+        case LUA_TTABLE:
+            lua_pushnil(L);
+            while(lua_next(L, (index > 0) ? index : index-1)) {
+                v(++i) = (real)lua_tonumber(L, -1);
+                lua_pop(L, 1);
+            }
+            if(lua_gettop(L) != NARG) {
+                lua_pushstring(L,
+                               "veclua_tovector() failed stack-size exit "
+                               "condition.");
+                lua_error(L);
+            }
+            return;
+        default:
+            return;
     }
-    return v;
-  }
-  break;
-  case LUA_TTABLE : {
-    lua_pushnil(L);
-    int m = 0;
-    while(lua_next(L, (index > 0) ? index : index-1)) {
-      m++;
-      lua_pop(L, 1);
-    }
-    vector v(m);
-    lua_pushnil(L);
-    while(lua_next(L, (index > 0) ? index : index-1)) {
-      /* value
-         key
-         ...
-         table
-      */
-      int i = (int)lua_tonumber(L, -2);
-      real vi = (real)lua_tonumber(L, -1);
-      v(i) = vi;
-      lua_pop(L, 1);
-    }
-    if(lua_gettop(L) != NARG) {
-      lua_pushstring(L, "veclua_tovector exit");
-      lua_error(L);
-    }
-    return v;
-  }
-  break; 
-  default :
-    return 0;
-  }
+
 }
+ 
