@@ -76,7 +76,7 @@ values of the speed at the crest.
 The various `matlab` scripts supplied can be used to generate .tikz output as
 per the publications and thesis. These scripts are _not_ Octave compatible.
 
-thesis_link:http://hdl.handle.net/2440/97905 
-jfm_link: https://doi.org/10.1017/jfm.2013.590
-gsl_link: https://www.gnu.org/software/gsl/
-lua_link: https://www.lua.org/manual/5.2/
+[thesis_link]: http://hdl.handle.net/2440/97905 
+[jfm_link]: https://doi.org/10.1017/jfm.2013.590
+[gsl_link]: https://www.gnu.org/software/gsl/
+[lua_link]: https://www.lua.org/manual/5.2/
