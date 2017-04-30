@@ -8,323 +8,115 @@
 #include "integrals_sbox.h"
 #include "integrals_sbox_formulation.h"
 
+#include <memory>
+
 extern "C" int luaopen_integrals_sbox_homotopy(lua_State*);
-
-/* Homotopy mapping */
-void pwlinear_cubic_homotopy_phi(const vector&, const vector&, const vector&, const vector&, vector&, const real);
-void pwlinear_cubic_homotopy_dphi(const vector&, const vector&, const vector&, const vector&, vector&, const real);
-
-static int pwlinear_cubic_homotopy_phi_luaf(lua_State*);
-static int pwlinear_cubic_homotopy_dphi_luaf(lua_State*);
-
-/* General formulation */
-static int x_homotopy_s(lua_State*);
-static int y_homotopy_s(lua_State*);
 
 static int tau_gaussian_s(lua_State*);
 static int tau_smoothbox_s(lua_State*);
 
-/* Symmetric formulation */
-static int x_homotopy_symmetric_s(lua_State*);
-/*static int y_homotopy_symmetric_s(lua_State*);*/
-
-static int x_gaussian_symmetric_b(lua_State*);
-static int x_smoothbox_symmetric_b(lua_State*);
-
-static int y_smoothbox_symmetric_b(lua_State*);
-
 static int tau_gaussian_symmetric_s(lua_State*);
 static int tau_smoothbox_symmetric_s(lua_State*);
 
+static int x_homotopy_s(lua_State*);
+static int y_homotopy_s(lua_State*);
 
+static int x_gaussian_b(lua_State*);
+static int y_gaussian_b(lua_State*);
+static int x_smoothbox_b(lua_State*);
+static int y_smoothbox_b(lua_State*);
+
+static int x_gaussian_symmetric_b(lua_State*);
+static int x_smoothbox_symmetric_b(lua_State*);
+static int y_gaussian_symmetric_b(lua_State*);
+static int y_smoothbox_symmetric_b(lua_State*);
+
+static inline int homotopy_s(lua_State*, cosine_or_sine);
+
+static inline int tau_s(lua_State*,
+                        const int,
+                        tpgraphy_integrand_func); 
+
+static inline int tau_symmetric_s(lua_State*,
+                                  const int,
+                                  tpgraphy_integrand_func);
+
+static inline int gaussian_symmetric_b(lua_State*,
+                                       const int,
+                                       tpgraphy_theta_func,
+                                       tpgraphy_integrand_func,
+                                       removed_singularity_b_func);
+   
 extern "C" const char integrals_lualib_name[]   = "integrals_sbox";
 extern "C" const char integrals_lualib_regkey[] = "integrals_sbox_rk";
 extern "C" const luaL_Reg integralsR[] = {
-{"tau_gaussian_s", tau_gaussian_s},
-{"tau_smoothbox_s", tau_smoothbox_s},
-{"x_s", x_homotopy_s},
-{"y_s", y_homotopy_s},
-{"tau_gaussian_symmetric_s", tau_gaussian_symmetric_s},
-{"tau_smoothbox_symmetric_s", tau_smoothbox_symmetric_s},
-{"x_symmetric_s", x_homotopy_symmetric_s},
-{"y_symmetric_s", y_homotopy_s},
-{"x_gaussian_symmetric_b", x_gaussian_symmetric_b},
-{"x_smoothbox_symmetric_b", x_smoothbox_symmetric_b},
-{"y_smoothbox_symmetric_b", y_smoothbox_symmetric_b},
-{"phi", pwlinear_cubic_homotopy_phi_luaf},
-{"dphi", pwlinear_cubic_homotopy_dphi_luaf},
-{NULL, NULL}
+    {"tau_gaussian_s", tau_gaussian_s},
+    {"tau_smoothbox_s", tau_smoothbox_s},
+    {"tau_gaussian_symmetric_s", tau_gaussian_symmetric_s},
+    {"tau_smoothbox_symmetric_s", tau_smoothbox_symmetric_s},
+    {"x_s", x_homotopy_s},
+    {"y_s", y_homotopy_s},
+    {"x_gaussian_b", x_gaussian_b},
+    {"y_gaussian_b", y_gaussian_b},
+    {"x_smoothbox_b", x_smoothbox_b},
+    {"y_smoothbox_b", y_smoothbox_b},
+    {"x_gaussian_symmetric_b", x_gaussian_symmetric_b},
+    {"y_gaussian_symmetric_b", y_gaussian_symmetric_b},
+    {"x_smoothbox_symmetric_b", x_smoothbox_symmetric_b},
+    {"y_smoothbox_symmetric_b", y_smoothbox_symmetric_b},
+    {"phi", pwlinear_cubic_homotopy_phi_luaf},
+    {"dphi", pwlinear_cubic_homotopy_dphi_luaf},
+    {NULL, NULL}
 };
 
 int luaopen_integrals_sbox_homotopy(lua_State *L)
 {
-  /** \todo May want to clarify the naming of the library. */
-  return luaopen_integrals_sbox(L);
+    /** \todo May want to clarify the naming of the library. */
+    return luaopen_integrals_sbox(L);
 }
 
-/**
-  Assumes \f$\beta\f$ is in increasing order.
-*/
-/** Calculates a piece-wise polynomial relationship between \f$\beta\f$ and \f$\phi\f$ based on a homotopy between a linear and a cubic interpolating spline.
+/* Is static ok here? */
+static inline int homotopy_s(lua_State* L, cosine_or_sine cos_sin) {
 
-  Calculates a piece-wise polynomial relationship between two variables,
-  \f$\beta\f$ and \f$\phi\f$, which is based on a homotopy parameter \f$s\f$
-  which varies the relationship between a piecewise linear spline and a piecewise
-  cubic spline. The genereal piecewise polynomial/homotopy is defined on the unit
-  intervals of \f$\beta\f$ given by \f$[i-1,i]\f$ for \f$i = 1,2,\ldots,n\f$.
-  Then the piecewise polynomial/homotopy is
-  \f[ p(\beta) = p_i(\beta) = (1-s) A_i(\beta) + sS_i(\beta) \f]
-  for \f$\beta \in [i-1,i]\f$.
+    static const int NARG = 7;
 
-  The data required for the polynomial are $\phi_i$ and $\phi_i'$ for
-  \f$i = 0, 1, \ldots, n\f$.
+    const int m = veclua_veclength(L, -NARG+0);
+    const int n = veclua_veclength(L, -NARG+2);
+    const int n_sub = veclua_veclength(L, -NARG+3);
 
-  \f$A_i\f$ is the piecewise linear interpolating function that satisfies two
-  equations based on the data:
+    const std::unique_ptr<real[]> heap_v(new real[n+(n-1)+(2*m)+(3*n_sub)]);
 
-  \f$A_i(i) = \phi_i\f$ and \f$A_i(i-1) = \phi_{i-1}\f$ for each 
-  \f$i = 1,2, \ldots, n\f$.
+    const real_vector theta_mid(    m,             &(heap_v[0]), L, -NARG+0);
+    const real_vector   tau_mid(    m,             &(heap_v[m]), L, -NARG+1);
+    const real_vector      beta(    n,           &(heap_v[2*m]), L, -NARG+2);
+    const real_vector  beta_sub(n_sub,       &(heap_v[(2*m)+n]), L, -NARG+3);
+    const real_vector   phi_sub(n_sub, &(heap_v[(2*m)+n+n_sub]), L, -NARG+4);
+    const real_vector  dphi_sub(n_sub,
+                                &(heap_v[(2*m)+n+(2*n_sub)]),
+                                L,
+                                -NARG+5); 
+    /* output vector */
+    real_vector z_s(n-1, &(heap_v[(2*m)+n+(3*n_sub)]));
+  
+    /* homotopy parameter */
+    const real s = lua_tonumber(L, -NARG+6);
 
-  \f$S_i\f$ is the piecewise cubic interpolating spline that satisfies four
-  equations based on the data:
+    lua_pop(L, NARG);
 
-  \f$S_i(i) = \phi_i\f$, \f$S_i(i-1) = \phi_{i-1}\f$, \f$S_i'(i) = \phi_i'\f$,
-  and \f$S_i'(i-1) = \phi_{i-1}'\f$ for each 
-  \f$i = 1,2, \ldots, n\f$.
+    real z0;
+    z_s_worker(                    theta_mid,  tau_mid,
+                                        beta, beta_sub,
+                                     phi_sub, dphi_sub,
+                                           s,
+                pwlinear_cubic_homotopy_dphi,  cos_sin,                           
+                                          z0,     z_s);
 
-  When \f$s = 0\f$ clearly the function is piecewise linear, and when
-  \f$s = 1\f$ it is a piecewise cubic.
+    veclua_pushtable(L, z_s);
 
-  \param beta A \f$m\f$-dimensional vector specifying the points at which the polynomial will be evaluated. 
-  \param beta_sub A \f$n+1\f$ dimensional vector specifying data to construct piecewise polynomial.
-  \param phi_sub A \f$n+1\f$-dimensional vector specifying data to construct the piecewise polynomial.
-  \param dphi_sub  A \f$n+1\f$-dimensional vector specifying data to construct the piecewise polynomial.
-  \param o A \f$m\f$-dimensional vector with the output of the function evaluated at the input \f$\beta\f$
-  \param s A homotopy parameter that should be between 0 and 1.
+    lua_pushnumber(L, z0);
 
-*/
-void pwlinear_cubic_homotopy_phi(const vector&     beta,
-                                 const vector& beta_sub,
-                                 const vector&  phi_sub,
-                                 const vector& dphi_sub,
-                                 vector              &o,
-                                 const real           s)
-{
-  unsigned int m = phi_sub.length();
+    return 2;
 
-  unsigned int j = 1;
-  for(unsigned int i = 1; i <= beta.length(); i++) {
-
-    if(beta(i) <= beta_sub(1)) {
-      o(i) = phi_sub(1) + (beta(i) - beta_sub(1)) * dphi_sub(1);
-    } else if(beta(i) > beta_sub(m)) {
-      o(i) = phi_sub(m) + (beta(i) - beta_sub(m)) * dphi_sub(m);
-    } else {
-      while(beta_sub(j) < beta(i)) {
-        j++;
-      }
-      
-      // beta_sub(j) is now right-hand end point, beta_sub(j-1) is left-hand end point
-
-      // Okay so the following terms help with the factors of the basis polynomials
-      real dbeta = beta_sub(j) - beta_sub(j-1);
-
-      real bi_sub_bj0 = beta(i) - beta_sub(j-1);
-      real bi_sub_bj1 = beta(i) - beta_sub(j);
-
-      real zero1 = (3.0*beta_sub(j-1) - beta_sub(j)) / 2.0;
-      real zero2 = (3.0*beta_sub(j) - beta_sub(j-1)) / 2.0;
-
-      // Calculate values of basis polynomials
-      real f1 = bi_sub_bj1 * bi_sub_bj1 *
-                (beta(i) - zero1) / (dbeta*dbeta*(beta_sub(j-1) - zero1));
-      real f2 = bi_sub_bj0 * bi_sub_bj0 *
-                (beta(i) - zero2) / (dbeta*dbeta*(beta_sub(j) - zero2));
-      real f3 = bi_sub_bj0 * bi_sub_bj1 * bi_sub_bj1 / (dbeta*dbeta);
-      real f4 = bi_sub_bj1 * bi_sub_bj0 * bi_sub_bj0 / (dbeta*dbeta);
-
-      // Construct phi using homotopy between linear interpolation and the cubic
-      //   interpolation with fixed, continuous, derivatives
-      o(i)  = (1.0-s) * ((phi_sub(j)*bi_sub_bj0) - (phi_sub(j-1)*bi_sub_bj1) ) / (dbeta);
-      o(i) += s*(f1*phi_sub(j-1)  + f2*phi_sub(j) +
-                 f3*dphi_sub(j-1) + f4*dphi_sub(j));
-    }
-  }
-}
-
-void pwlinear_cubic_homotopy_dphi(const vector&     beta,
-                                  const vector& beta_sub,
-                                  const vector&  phi_sub,
-                                  const vector& dphi_sub,
-                                  vector              &o,
-                                  const real           s)
-{
-  unsigned int m = phi_sub.length();
-
-  unsigned int j = 1;
-  for(unsigned int i = 1; i <= beta.length(); i++) {
-
-    if(beta(i) <= beta_sub(1)) {
-      o(i) = dphi_sub(1);
-    } else if(beta(i) > beta_sub(m)) {
-      o(i) = dphi_sub(m);
-    } else {
-      while(beta_sub(j) < beta(i)) {
-        j++;
-      }
-
-      // beta_sub(j) is now right-hand end point, beta_sub(j-1) is left-hand end point
-
-      // Okay so the following terms help with the factors of the basis polynomials
-      real dbeta = beta_sub(j) - beta_sub(j-1);
-
-      real bi_sub_bj0 = beta(i) - beta_sub(j-1);
-      real bi_sub_bj1 = beta(i) - beta_sub(j);
-
-      real zero1 = (3.0*beta_sub(j-1) - beta_sub(j)) / 2.0;
-      real zero2 = (3.0*beta_sub(j) - beta_sub(j-1)) / 2.0;
-
-      // Calculate values of basis polynomials
-      real df1 = bi_sub_bj1 * (2.0*(beta(i) - zero1) + bi_sub_bj1) /
-                 (dbeta*dbeta*(beta_sub(j-1) - zero1));
-      real df2 = bi_sub_bj0 * (2.0*(beta(i) - zero2) + bi_sub_bj0) /
-                 (dbeta*dbeta*(beta_sub(j) - zero2));
-      real df3 = bi_sub_bj1*(2.0*bi_sub_bj0 + bi_sub_bj1) / (dbeta*dbeta);
-      real df4 = bi_sub_bj0*(2.0*bi_sub_bj1 + bi_sub_bj0) / (dbeta*dbeta);
-
-      // Construct phi using homotopy between linear interpolation and the cubic
-      //   interpolation with fixed, continuous, derivatives
-      o(i)  = (1.0-s) * (phi_sub(j) - phi_sub(j-1)) / (dbeta);
-      o(i) += s*(df1*phi_sub(j-1)  + df2*phi_sub(j) +
-                 df3*dphi_sub(j-1) + df4*dphi_sub(j));
-    }
-  }
-}
-
-int pwlinear_cubic_homotopy_phi_luaf(lua_State* L)
-{
-  static const int NARG = 5;
-
-  vector beta     = veclua_tovector(L, -NARG+0);
-  vector beta_sub = veclua_tovector(L, -NARG+1);
-  vector phi_sub  = veclua_tovector(L, -NARG+2);
-  vector dphi_sub = veclua_tovector(L, -NARG+3);
-  real   s        = lua_tonumber(L, -NARG+4);
-
-  lua_pop(L, NARG);
-
-  unsigned int m = phi_sub.length();
-  unsigned int j = 1;
-
-  lua_newtable(L);
-
-  for(unsigned int i = 1; i <= beta.length(); i++) {
-    real o_i = 0.0;
-
-    if(beta(i) <= beta_sub(1)) {
-      o_i = phi_sub(1) + (beta(i) - beta_sub(1)) * dphi_sub(1);
-    } else if(beta(i) > beta_sub(m)) {
-      o_i = phi_sub(m) + (beta(i) - beta_sub(m)) * dphi_sub(m);
-    } else {
-      while(beta_sub(j) < beta(i)) {
-        j++;
-      }
-      // beta_sub(j) is now right-hand end point, beta_sub(j-1) is left-hand end point
-
-      // Okay so the following terms help with the factors of the basis polynomials
-      real dbeta = beta_sub(j) - beta_sub(j-1);
-
-      real bi_sub_bj0 = beta(i) - beta_sub(j-1);
-      real bi_sub_bj1 = beta(i) - beta_sub(j);
-
-      real zero1 = (3.0*beta_sub(j-1) - beta_sub(j)) / 2.0;
-      real zero2 = (3.0*beta_sub(j) - beta_sub(j-1)) / 2.0;
-
-      // Calculate values of basis polynomials
-      real f1 = bi_sub_bj1 * bi_sub_bj1 *
-                (beta(i) - zero1) / (dbeta*dbeta*(beta_sub(j-1) - zero1));
-      real f2 = bi_sub_bj0 * bi_sub_bj0 *
-                (beta(i) - zero2) / (dbeta*dbeta*(beta_sub(j) - zero2));
-      real f3 = bi_sub_bj0 * bi_sub_bj1 * bi_sub_bj1 / (dbeta*dbeta);
-      real f4 = bi_sub_bj1 * bi_sub_bj0 * bi_sub_bj0 / (dbeta*dbeta);
-
-      // Construct phi using homotopy between linear interpolation and the cubic
-      //   interpolation with fixed, continuous, derivatives
-      o_i  = (1.0-s) * ((phi_sub(j)*bi_sub_bj0) - (phi_sub(j-1)*bi_sub_bj1) ) / (dbeta);
-      o_i += s*(f1*phi_sub(j-1)  + f2*phi_sub(j) +
-                f3*dphi_sub(j-1) + f4*dphi_sub(j));
-    }
-
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, o_i);
-    lua_rawset(L, -3);
-  }
-
-  return 1;
-}
-
-
-int pwlinear_cubic_homotopy_dphi_luaf(lua_State* L)
-{
-  static const int NARG = 5;
-
-  vector beta     = veclua_tovector(L, -NARG+0);
-  vector beta_sub = veclua_tovector(L, -NARG+1);
-  vector phi_sub  = veclua_tovector(L, -NARG+2);
-  vector dphi_sub = veclua_tovector(L, -NARG+3);
-  real   s        = lua_tonumber(L, -NARG+4);
-
-  lua_pop(L, NARG);
-
-  unsigned int m = phi_sub.length();
-  unsigned int j = 1;
-
-  lua_newtable(L);
-
-  for(unsigned int i = 1; i <= beta.length(); i++) {
-    real o_i = 0.0;
-
-    if(beta(i) <= beta_sub(1)) {
-      o_i = dphi_sub(1);
-    } else if(beta(i) > beta_sub(m)) {
-      o_i = dphi_sub(m);
-    } else {
-      while(beta_sub(j) < beta(i)) {
-        j++;
-      }
-
-      // beta_sub(j) is now right-hand end point, beta_sub(j-1) is left-hand end point
-
-      // Okay so the following terms help with the factors of the basis polynomials
-      real dbeta = beta_sub(j) - beta_sub(j-1);
-
-      real bi_sub_bj0 = beta(i) - beta_sub(j-1);
-      real bi_sub_bj1 = beta(i) - beta_sub(j);
-
-      real zero1 = (3.0*beta_sub(j-1) - beta_sub(j)) / 2.0;
-      real zero2 = (3.0*beta_sub(j) - beta_sub(j-1)) / 2.0;
-
-      // Calculate values of basis polynomials
-      real df1 = bi_sub_bj1 * (2.0*(beta(i) - zero1) + bi_sub_bj1) /
-                 (dbeta*dbeta*(beta_sub(j-1) - zero1));
-      real df2 = bi_sub_bj0 * (2.0*(beta(i) - zero2) + bi_sub_bj0) /
-                 (dbeta*dbeta*(beta_sub(j) - zero2));
-      real df3 = bi_sub_bj1*(2.0*bi_sub_bj0 + bi_sub_bj1) / (dbeta*dbeta);
-      real df4 = bi_sub_bj0*(2.0*bi_sub_bj1 + bi_sub_bj0) / (dbeta*dbeta);
-
-      // Construct phi using homotopy between linear interpolation and the cubic
-      //   interpolation with fixed, continuous, derivatives
-      o_i  = (1.0-s) * (phi_sub(j) - phi_sub(j-1)) / (dbeta);
-      o_i += s*(df1*phi_sub(j-1)  + df2*phi_sub(j) +
-                df3*dphi_sub(j-1) + df4*dphi_sub(j));
-    }
-
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, o_i);
-    lua_rawset(L, -3);
-  }
-
-  return 1;
 }
 
 /** Entry point to compute surface \f$x_s(\beta_{j+1/2})\f$ using \f$\tau\f$ and \f$\theta\f$.
@@ -339,45 +131,11 @@ int pwlinear_cubic_homotopy_dphi_luaf(lua_State* L)
  - s scalar; optional homotopy parameter.
  \param L Lua stack pointer.
 */
-int x_homotopy_s(lua_State* L)
-{
-  static const int NARG = 7;
-  
-  vector theta_mid = veclua_tovector(L, -NARG+0);
-  vector tau_mid   = veclua_tovector(L, -NARG+1);
-  vector beta      = veclua_tovector(L, -NARG+2);
-  vector beta_sub  = veclua_tovector(L, -NARG+3);
-  vector phi_sub   = veclua_tovector(L, -NARG+4);
-  vector dphi_sub  = veclua_tovector(L, -NARG+5);
-  real   s         = lua_tonumber(L, -NARG+6);
-
-  real x0;
-
-  lua_pop(L, NARG);
-
-  vector x_s = x_s_worker(theta_mid,
-                            tau_mid,
-                               beta,
-                           beta_sub,
-                            phi_sub,
-                           dphi_sub,
-                                  s,
-       pwlinear_cubic_homotopy_dphi,
-                                 x0);
-
-  lua_newtable(L);
-  for(unsigned int j = 1; j <= x_s.length(); j++) {
-    lua_pushnumber(L, j);
-    lua_pushnumber(L, x_s(j));
-    lua_rawset(L, -3);
-  }
-
-  lua_pushnumber(L, x0);
-
-  return 2;
+int x_homotopy_s(lua_State* L) {
+ 
+    return homotopy_s(L, USE_COSINE);
 
 }
-
 
 /** Entry point to compute surface \f$y_s(\beta_{j+1/2})\f$ using \f$\theta\f$ and \f$\tau\f$.
   
@@ -391,598 +149,473 @@ int x_homotopy_s(lua_State* L)
  - s scalar; optional homotopy parameter.
  \param L Lua stack pointer.
 */
+int y_homotopy_s(lua_State* L) {
 
-int y_homotopy_s(lua_State* L)
-{
-  static const int NARG = 7;
-  
-  vector theta_mid = veclua_tovector(L, -NARG+0);
-  vector tau_mid   = veclua_tovector(L, -NARG+1);
-  vector beta      = veclua_tovector(L, -NARG+2);
-  vector beta_sub  = veclua_tovector(L, -NARG+3);
-  vector phi_sub   = veclua_tovector(L, -NARG+4);
-  vector dphi_sub  = veclua_tovector(L, -NARG+5);
-  real   s         = lua_tonumber(L, -NARG+6);
-
-  real eta0;
- 
-  lua_pop(L, NARG);
-
-  vector y_s = y_s_worker(theta_mid, 
-                            tau_mid,
-                               beta, 
-			   beta_sub,
-                            phi_sub,
-                           dphi_sub,
-                                  s,
-       pwlinear_cubic_homotopy_dphi,
-                               eta0);
-
-  lua_newtable(L);
-  for(unsigned int j = 1; j <= y_s.length(); j++) {
-    lua_pushnumber(L, j);
-    lua_pushnumber(L, y_s(j));
-    lua_rawset(L, -3);
-  }
-
-  lua_pushnumber(L, eta0);
-  
-  return 2;
-}
-
-/** \todo this is where things gets weird - well, not really weird, i just need to pull my finger out and do some work. */
-int tau_gaussian_s(lua_State* L)
-{
-  static const int NARG = 12;
-
-  /* free surface grid arguments */
-  const vector theta_s  = veclua_tovector(L, -NARG+0);
-  const vector phi_sub  = veclua_tovector(L, -NARG+1);
-  const vector dphi_sub = veclua_tovector(L, -NARG+2);
-  const vector beta     = veclua_tovector(L, -NARG+3);
-  const vector beta_sub = veclua_tovector(L, -NARG+4);
-
-  /* topography parameters */
-  const real A = lua_tonumber(L,-NARG+5);
-  const real B = lua_tonumber(L,-NARG+6);
-
-  /* far stream parameters */
-  const real D_dstream = lua_tonumber(L, -NARG+7);
-  const real D_ustream = lua_tonumber(L, -NARG+8);
-  const real lambda     = lua_tonumber(L, -NARG+9);
-  const real gamma      = lua_tonumber(L, -NARG+10);
-
-  /* homotopy parameter */
-  const real s          = lua_tonumber(L, -NARG+11);
-
-  lua_pop(L, NARG);
-
-  linear_params lin_us = {lambda, gamma, D_ustream, phi_sub(1)};
-  linear_params lin_ds = {lambda, gamma, D_dstream, phi_sub(phi_sub.length())};
-
-  vector tpgraphy_params = vector(2);
-  tpgraphy_params(1) = A;
-  tpgraphy_params(2) = B;
-
-  lua_pushstring(L, integrals_lualib_regkey);
-  lua_gettable(L, LUA_REGISTRYINDEX);
-  gsl_integration_workspace **ws = (gsl_integration_workspace**)lua_touserdata(L, -1);
-
-  method_s_funcs homotopy_method = {&pwlinear_cubic_homotopy_phi,
-                                   &pwlinear_cubic_homotopy_dphi,
-                                          &compute_convolution_s,
-                                  &removed_singularity_general_s,
-                                       &far_upstream_integrand_s,
-                                     &far_downstream_integrand_s,
-                                                     &gaussian_b};
-
-  const vector tau_s = tau_s_worker(theta_s,
-                                    phi_sub,
-                                   dphi_sub,
-                                       beta,
-                                   beta_sub,
-                            tpgraphy_params,
-                                     lin_us,
-                                     lin_ds,
-                                          s,
-                                         ws,
-                            homotopy_method);
-  
-    
-  lua_newtable(L);
-
-  for(unsigned int i = 1; i <= tau_s.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, tau_s(i));
-    lua_rawset(L, -3);
-  }
-
-  return 1;
-}
-
-/** \todo this is where things gets weird - well, not really weird, i just need to pull my finger out and do some work.
-
-\todo fix up parameters */
-int tau_smoothbox_s(lua_State* L)
-{
-  static const int NARG = 14;
-
-  /* free surface grid arguments */
-  const vector theta_s  = veclua_tovector(L, -NARG+0);
-  const vector phi_sub  = veclua_tovector(L, -NARG+1);
-  const vector dphi_sub = veclua_tovector(L, -NARG+2);
-  const vector beta     = veclua_tovector(L, -NARG+3);
-  const vector beta_sub = veclua_tovector(L, -NARG+4);
-
-  /* topography parameters */
-  const real A     = lua_tonumber(L,-NARG+5);
-  const real B     = lua_tonumber(L,-NARG+6);
-  const real l     = lua_tonumber(L,-NARG+7);
-  const real phi_c = lua_tonumber(L,-NARG+8);
-
-  /* far stream parameters */
-  const real D_dstream = lua_tonumber(L, -NARG+9);
-  const real D_ustream = lua_tonumber(L, -NARG+10);
-  const real lambda     = lua_tonumber(L, -NARG+11);
-  const real gamma      = lua_tonumber(L, -NARG+12);
-
-  /* homotopy parameter */
-  const real s          = lua_tonumber(L, -NARG+13);
-
-  lua_pop(L, NARG);
-
-  linear_params lin_us = {lambda, gamma, D_ustream, phi_sub(1)};
-  linear_params lin_ds = {lambda, gamma, D_dstream, phi_sub(phi_sub.length())};
-
-  vector tpgraphy_params = vector(4);
-  tpgraphy_params(1) = A;
-  tpgraphy_params(2) = B;
-  tpgraphy_params(3) = l;
-  tpgraphy_params(4) = phi_c;
-  // NEED TO ADJUST THESE!
-
-  lua_pushstring(L, integrals_lualib_regkey);
-  lua_gettable(L, LUA_REGISTRYINDEX);
-  gsl_integration_workspace **ws = (gsl_integration_workspace**)lua_touserdata(L, -1);
-
-  method_s_funcs homotopy_method = {&pwlinear_cubic_homotopy_phi,
-                                   &pwlinear_cubic_homotopy_dphi,
-                                          &compute_convolution_s,
-                                  &removed_singularity_general_s,
-                                       &far_upstream_integrand_s,
-                                     &far_downstream_integrand_s,
-                                                    &smoothbox_b};
-
-  const vector tau_s = tau_s_worker(theta_s,
-                                    phi_sub,
-                                   dphi_sub,
-                                       beta,
-                                   beta_sub,
-                            tpgraphy_params,
-                                     lin_us,
-                                     lin_ds,
-                                          s,
-                                         ws,
-                            homotopy_method);
-  
-    
-  lua_newtable(L);
-
-  for(unsigned int i = 1; i <= tau_s.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, tau_s(i));
-    lua_rawset(L, -3);
-  }
-
-  return 1;
-}
-
-/** Entry point to compute surface \f$x_s(\beta_{j+1/2})\f$ using \f$\tau\f$ and \f$\theta\f$.
-  
-   Arguments are passed by the lua stack
- - theta_mid \f$(n-1)\f$-vector; the angle of the free surface at \f$\beta_{j+1/2}\f$.
- - tau_mid \f$(n-1)\f$-vector; the log of the speed on the free surface at \f$\beta_{j+1/2}\f$.
- - beta \f$(n)\f$-vector; the grid points \f$\beta_j\f$.
- - beta_sub \f$(m)\f$-vector; \f$\beta\f$ at \f$\phi^{[j]}\f$.
- - phi_sub \f$(m)\f$-vector; 'clustering' locations in computational grid; \f$\phi^{[j]}\f$.
- - dphi_sub \f$(m)\f$-vector; value of \f$\phi'\f$ at \f$\phi^{[j]}\f$.
- - s scalar; optional homotopy parameter.
- \param L Lua stack pointer.
-*/
-int x_homotopy_symmetric_s(lua_State* L)
-{
-  static const int NARG = 7;
-  
-  vector theta_mid = veclua_tovector(L, -NARG+0);
-  vector tau_mid   = veclua_tovector(L, -NARG+1);
-  vector beta      = veclua_tovector(L, -NARG+2);
-  vector beta_sub  = veclua_tovector(L, -NARG+3);
-  vector phi_sub   = veclua_tovector(L, -NARG+4);
-  vector dphi_sub  = veclua_tovector(L, -NARG+5);
-  real   s         = lua_tonumber(L, -NARG+6);
-
-  real x0;
-
-  lua_pop(L, NARG);
-
-  vector x_s = x_s_worker(theta_mid,
-                            tau_mid,
-                               beta,
-                           beta_sub, 
-                            phi_sub, 
-                           dphi_sub,
-                                  s, 
-       pwlinear_cubic_homotopy_dphi,
-                                 x0);
-
-  lua_newtable(L);
-  for(unsigned int j = 1; j <= x_s.length(); j++) {
-    lua_pushnumber(L, j);
-    lua_pushnumber(L, x_s(j)-x0);
-    lua_rawset(L, -3);
-  }
-
-  return 1;
+    return homotopy_s(L, USE_SINE);
 
 }
 
-int tau_gaussian_symmetric_s(lua_State* L)
-{
-  static const int NARG = 11;
 
-  /* free surface grid arguments */
-  const vector theta_s  = veclua_tovector(L, -NARG+0);
-  const vector phi_sub  = veclua_tovector(L, -NARG+1);
-  const vector dphi_sub = veclua_tovector(L, -NARG+2);
-  const vector beta     = veclua_tovector(L, -NARG+3);
-  const vector beta_sub = veclua_tovector(L, -NARG+4);
+static inline int tau_s(lua_State*                        L,
+                        const int                   n_t_arg,
+                        tpgraphy_integrand_func integrand_b) {
 
-  /* topography parameters */
-  const real A = lua_tonumber(L,-NARG+5);
-  const real B = lua_tonumber(L,-NARG+6);
+    const int NARG = 11 + n_t_arg;
 
-  /* far field parameters */
-  const real D      = lua_tonumber(L, -NARG+7);
-  const real lambda = lua_tonumber(L, -NARG+8);
-  const real gamma  = lua_tonumber(L, -NARG+9);
-  const real s      = lua_tonumber(L, -NARG+10);
+    const int m     = veclua_veclength(L, -NARG+0);
+    const int n_sub = veclua_veclength(L, -NARG+1);
+    const int n     = veclua_veclength(L, -NARG+3);
 
-  lua_pop(L, NARG);
+    const std::unique_ptr<real[]> heap_v(
+                                      new real[m+n+(n-1)+(3*n_sub)+n_t_arg]
+                                  );
 
-  linear_params lin_us = {lambda, gamma, D, -phi_sub(phi_sub.length())};
-  linear_params lin_ds = {lambda, gamma, D,  phi_sub(phi_sub.length())};
+    /* free surface grid arguments */
+    const real_vector  theta_s(    m,             &(heap_v[0]), L, -NARG+0);
+    const real_vector  phi_sub(n_sub,             &(heap_v[m]), L, -NARG+1);
+    const real_vector dphi_sub(n_sub,           &(heap_v[m+n]), L, -NARG+2);
+    const real_vector beta_sub(n_sub,     &(heap_v[m+n+n_sub]), L, -NARG+4);
+    const real_vector     beta(    n, &(heap_v[m+n+(2*n_sub)]), L, -NARG+3);
+    /* output vector */
+    real_vector tau_s(n-1, &(heap_v[m+n+(3*n_sub)]));
 
-
-  vector tpgraphy_params = vector(2);
-  tpgraphy_params(1) = A;
-  tpgraphy_params(2) = B;
-
-  lua_pushstring(L, integrals_lualib_regkey);
-  lua_gettable(L, LUA_REGISTRYINDEX);
-  gsl_integration_workspace **ws = (gsl_integration_workspace**)lua_touserdata(L, -1);
-
-  method_s_funcs homotopy_method = {&pwlinear_cubic_homotopy_phi,
-                                   &pwlinear_cubic_homotopy_dphi,
-                                &compute_convolution_symmetric_s,
-                                &removed_singularity_symmetric_s,
-                             &far_upstream_symmetric_integrand_s,
-                           &far_downstream_symmetric_integrand_s,
-                                                     &gaussian_b};
-
-  const vector tau_s = tau_s_worker(theta_s,
-                                    phi_sub,
-                                   dphi_sub,
-                                       beta,
-                                   beta_sub,
-                            tpgraphy_params,
-                                     lin_us,
-                                     lin_ds,
-                                          s,
-                                         ws,
-                            homotopy_method);
+    /* topography parameters */
+    real_vector topography_params(4, &(heap_v[m+n+(n-1)+(3*n_sub)]));
+    for(int j = 1; j <= n_t_arg; j++) {
+        topography_params(j) = lua_tonumber(L, -NARG+4+j);
+    }
 
 
-  lua_newtable(L);
+    /* far field parameters */
+    const real D_ffds      = lua_tonumber(L, -NARG+n_t_arg+5);
+    const real D_ffus      = lua_tonumber(L, -NARG+n_t_arg+6);
+    const real lambda_ffds = lua_tonumber(L, -NARG+n_t_arg+7);
+    const real lambda_ffus = lua_tonumber(L, -NARG+n_t_arg+8);
+    const real gamma       = lua_tonumber(L, -NARG+n_t_arg+9);
 
-  for(unsigned int i = 1; i <= tau_s.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, tau_s(i));
-    lua_rawset(L, -3);
-  }
+    /* homotopy parameter */
+    const real s = lua_tonumber(L, -NARG+n_t_arg+10);
 
+    lua_pop(L, NARG);
 
-  return 1;
+    ff_params ffus_params = {lambda_ffus,
+                             gamma,
+                             D_ffus,
+                             phi_sub(1)};
+    ff_params ffds_params = {lambda_ffds,
+                             gamma,
+                             D_ffds,
+                             phi_sub(phi_sub.length())};
+
+    lua_pushstring(L, integrals_lualib_regkey);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    gsl_integration_workspace **ws =
+        (gsl_integration_workspace**)lua_touserdata(L, -1);
+
+    method_s_funcs homotopy_method = {pwlinear_cubic_homotopy_phi,
+                                      pwlinear_cubic_homotopy_dphi,
+                                      compute_convolution_s,
+                                      removed_singularity_general_s,
+                                      far_upstream_integrand_s,
+                                      far_downstream_integrand_s,
+                                      integrand_b};
+
+    tau_s_worker(          theta_s,
+                           phi_sub,    dphi_sub,
+                              beta,    beta_sub,
+                 topography_params,
+                       ffus_params, ffds_params,
+                                 s,          ws,
+                   homotopy_method,
+                             tau_s);
+
+    veclua_pushtable(L, tau_s);
+
+    return 1;
+
 }
 
 
-int tau_smoothbox_symmetric_s(lua_State* L)
-{
-  static const int NARG = 13;
+int tau_gaussian_s(lua_State* L) {
 
-  /* free surface grid arguments */
-  const vector theta_s  = veclua_tovector(L, -NARG+0);
-  const vector phi_sub  = veclua_tovector(L, -NARG+1);
-  const vector dphi_sub = veclua_tovector(L, -NARG+2);
-  const vector beta     = veclua_tovector(L, -NARG+3);
-  const vector beta_sub = veclua_tovector(L, -NARG+4);
+    /* topography parameters
+     * A - the amplitude
+     * B - the coefficient of x in the exponential
+     * L - the actual physical distance between inflection points */
 
-  /* topography parameters */
-  const real A     = lua_tonumber(L,-NARG+5);
-  const real B     = lua_tonumber(L,-NARG+6);
-  const real l     = lua_tonumber(L,-NARG+7);
-  const real phi_c = lua_tonumber(L,-NARG+8);
+    return tau_s(L, 3, gaussian_b);
 
-  /* far field parameters */
-  const real D          = lua_tonumber(L, -NARG+9);
-  const real lambda     = lua_tonumber(L, -NARG+10);
-  const real gamma      = lua_tonumber(L, -NARG+11);
-
-  /* homotopy parameter */
-  const real s          = lua_tonumber(L, -NARG+12);
-
-  lua_pop(L, NARG);
-
-  linear_params lin_us = {lambda, gamma, D, -phi_sub(phi_sub.length())};
-  linear_params lin_ds = {lambda, gamma, D,  phi_sub(phi_sub.length())};
-
-  vector tpgraphy_params = vector(4);
-  tpgraphy_params(1) = A;
-  tpgraphy_params(2) = B;
-  tpgraphy_params(3) = l;
-  tpgraphy_params(4) = phi_c;
-
-  lua_pushstring(L, integrals_lualib_regkey);
-  lua_gettable(L, LUA_REGISTRYINDEX);
-  gsl_integration_workspace **ws = (gsl_integration_workspace**)lua_touserdata(L, -1);
-
-  method_s_funcs homotopy_method = {&pwlinear_cubic_homotopy_phi,
-                                   &pwlinear_cubic_homotopy_dphi,
-                                &compute_convolution_symmetric_s,
-                                &removed_singularity_symmetric_s,
-                             &far_upstream_symmetric_integrand_s,
-                           &far_downstream_symmetric_integrand_s,
-                                                    &smoothbox_b};
-  
-  const vector tau_s = tau_s_worker(theta_s,
-                                    phi_sub,
-                                   dphi_sub,
-                                       beta,
-                                   beta_sub,
-                            tpgraphy_params,
-                                     lin_us,
-                                     lin_ds,
-                                          s,
-                                         ws,
-                            homotopy_method);
-
-  lua_newtable(L);
-
-  for(unsigned int i = 1; i <= tau_s.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, tau_s(i));
-    lua_rawset(L, -3);
-  }
-
-  return 1;
 }
 
-int x_gaussian_symmetric_b(lua_State* L)
-{
-  static const int NARG = 13;
 
-  /* Desired values */
-  const vector phi     = veclua_tovector(L, -NARG+0);
+int tau_smoothbox_s(lua_State* L) {
 
-  /* free surface grid arguments */
-  const vector theta_s  = veclua_tovector(L, -NARG+1);
-  const vector beta_s   = veclua_tovector(L, -NARG+2);
-  const vector phi_sub  = veclua_tovector(L, -NARG+3);
-  const vector dphi_sub = veclua_tovector(L, -NARG+4);
-  const vector beta_sub = veclua_tovector(L, -NARG+5);
+    /* topography parameters
+     * A - the amplitude (depth)
+     * B - rate (of decay) in the exponential terms
+     * l - the actual physical distance between inflection points
+     * phi_c - location of inflection points in phi */
 
-  /* topography parameters */
-  const real A     = lua_tonumber(L,-NARG+6);
-  const real B     = lua_tonumber(L,-NARG+7);
-  const real l     = lua_tonumber(L,-NARG+8);
+    return tau_s(L, 4, smoothbox_b);
 
-  /* far field parameters */
-  const real D          = lua_tonumber(L, -NARG+9);
-  const real lambda     = lua_tonumber(L, -NARG+10);
-  const real gamma      = lua_tonumber(L, -NARG+11);
-  const real s          = lua_tonumber(L, -NARG+12);
-
-  lua_pop(L, NARG);
-
-  linear_params lin_us = {lambda, gamma, D, -phi_sub(phi_sub.length())};
-  linear_params lin_ds = {lambda, gamma, D,  phi_sub(phi_sub.length())};
-
-  vector tpgraphy_params = vector(3);
-  tpgraphy_params(1) = A;
-  tpgraphy_params(2) = B;
-  tpgraphy_params(3) = l;
-
-  lua_pushstring(L, integrals_lualib_regkey);
-  lua_gettable(L, LUA_REGISTRYINDEX);
-  gsl_integration_workspace **ws = (gsl_integration_workspace**)lua_touserdata(L, -1);
-
-  method_b_funcs homotopy_method = {&pwlinear_cubic_homotopy_phi,
-                                   &pwlinear_cubic_homotopy_dphi,
-                                                 &gaussian_theta,
-                     &topography_compute_symmetric_convolution_s,
-                                &topography_gaussian_integrand_b,
-                      &topography_gaussian_removed_singularity_b,
-                                      &topography_far_upstream_s,
-                                    &topography_far_downstream_s};
-
-  const vector x_b = x_b_worker(phi,
-                            theta_s,
-                             beta_s,
-                           beta_sub,
-                            phi_sub,
-                           dphi_sub,
-                                  s,
-                                 ws,
-                    homotopy_method,
-                    tpgraphy_params,
-                             lin_us,
-                             lin_ds);
-
-  lua_newtable(L);
-
-  for(unsigned int i = 1; i <= x_b.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, x_b(i));
-    lua_rawset(L, -3);
-  }
-
-  return 1;
 }
 
-int x_smoothbox_symmetric_b(lua_State* L)
-{
-  static const int NARG = 14;
 
-  /* Desired values */
-  const vector phi     = veclua_tovector(L, -NARG+0);
+/** \todo documentation */
+static inline int tau_symmetric_s(lua_State*                        L,
+                                  const int                   n_t_arg,
+                                  tpgraphy_integrand_func integrand_b) {
 
-  /* free surface grid arguments */
-  const vector theta_s  = veclua_tovector(L, -NARG+1);
-  const vector beta_s   = veclua_tovector(L, -NARG+2);
-  const vector phi_sub  = veclua_tovector(L, -NARG+3);
-  const vector dphi_sub = veclua_tovector(L, -NARG+4);
-  const vector beta_sub = veclua_tovector(L, -NARG+5);
+    const int NARG = 9 + n_t_arg;
 
-  /* topography parameters */
-  const real A     = lua_tonumber(L,-NARG+6);
-  const real B     = lua_tonumber(L,-NARG+7);
-  const real l     = lua_tonumber(L,-NARG+8);
-  const real phi_c = lua_tonumber(L,-NARG+9);
+    const int m     = veclua_veclength(L, -NARG+0);
+    const int n_sub = veclua_veclength(L, -NARG+1);
+    const int n     = veclua_veclength(L, -NARG+3);
 
-  /* far field parameters */
-  const real D          = lua_tonumber(L, -NARG+10);
-  const real lambda     = lua_tonumber(L, -NARG+11);
-  const real gamma      = lua_tonumber(L, -NARG+12);
-  const real s          = lua_tonumber(L, -NARG+13);
+    const std::unique_ptr<real[]> heap_v(
+                                      new real[m+n+(n-1)+(3*n_sub)+n_t_arg]
+                                  );
 
-  lua_pop(L, NARG);
+    /* free surface grid arguments */
+    const real_vector  theta_s(    m,             &(heap_v[0]), L, -NARG+0);
+    const real_vector  phi_sub(n_sub,             &(heap_v[m]), L, -NARG+1);
+    const real_vector dphi_sub(n_sub,           &(heap_v[m+n]), L, -NARG+2);
+    const real_vector beta_sub(n_sub,     &(heap_v[m+n+n_sub]), L, -NARG+4);
+    const real_vector     beta(    n, &(heap_v[m+n+(2*n_sub)]), L, -NARG+3);
+    /* output vector */
+    real_vector tau_s(n-1, &(heap_v[m+n+(3*n_sub)]));
 
-  linear_params lin_us = {lambda, gamma, D, -phi_sub(phi_sub.length())};
-  linear_params lin_ds = {lambda, gamma, D,  phi_sub(phi_sub.length())};
+    /* topography parameters */
+    real_vector topography_params(4, &(heap_v[m+n+(n-1)+(3*n_sub)]));
+    for(int j = 1; j <= n_t_arg; j++) {
+        topography_params(j) = lua_tonumber(L, -NARG+4+j);
+    }
 
-  vector tpgraphy_params = vector(4);
-  tpgraphy_params(1) = A;
-  tpgraphy_params(2) = B;
-  tpgraphy_params(3) = l;
-  tpgraphy_params(4) = phi_c;
+    /* far field parameters */
+    const real D      = lua_tonumber(L, -NARG+n_t_arg+5);
+    const real lambda = lua_tonumber(L, -NARG+n_t_arg+6);
+    const real gamma  = lua_tonumber(L, -NARG+n_t_arg+7);
 
-  lua_pushstring(L, integrals_lualib_regkey);
-  lua_gettable(L, LUA_REGISTRYINDEX);
-  gsl_integration_workspace **ws = (gsl_integration_workspace**)lua_touserdata(L, -1);
+    /* homotopy parameter */
+    const real s = lua_tonumber(L, -NARG+n_t_arg+8);
 
-  method_b_funcs homotopy_method = {&pwlinear_cubic_homotopy_phi,
-                                   &pwlinear_cubic_homotopy_dphi,
-                                                &smoothbox_theta,
-		     &topography_compute_symmetric_convolution_s,
-                               &topography_smoothbox_integrand_b,
-                     &topography_smoothbox_removed_singularity_b,
-                                      &topography_far_upstream_s,
-                                    &topography_far_downstream_s};
+    lua_pop(L, NARG);
 
-  const vector x_b = x_b_worker(phi,
-                            theta_s,
-                             beta_s,
-                           beta_sub,
-                            phi_sub,
-                           dphi_sub,
-                                  s,
-                                 ws,
-                    homotopy_method,
-                    tpgraphy_params,
-                             lin_us,
-                             lin_ds);
+    ff_params ffus_params = {lambda,
+                             gamma,
+                             D,
+                             -phi_sub(phi_sub.length())};
+    ff_params ffds_params = {lambda,
+                             gamma,
+                             D,
+                             phi_sub(phi_sub.length())};
 
-  lua_newtable(L);
+    lua_pushstring(L, integrals_lualib_regkey);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    gsl_integration_workspace **ws =
+        (gsl_integration_workspace**)lua_touserdata(L, -1);
 
-  for(unsigned int i = 1; i <= x_b.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, x_b(i));
-    lua_rawset(L, -3);
-  }
+    method_s_funcs homotopy_method = {pwlinear_cubic_homotopy_phi,
+                                      pwlinear_cubic_homotopy_dphi,
+                                      compute_convolution_symmetric_s,
+                                      removed_singularity_symmetric_s,
+                                      far_upstream_integrand_s,
+                                      far_downstream_integrand_s,
+                                      integrand_b};
 
-  return 1;
+    tau_s_worker(          theta_s,
+                           phi_sub,    dphi_sub, 
+                              beta,    beta_sub,
+                 topography_params,
+                       ffus_params, ffds_params,
+                                 s,          ws,
+                   homotopy_method,
+                             tau_s);
+
+    veclua_pushtable(L, tau_s);
+
+    return 1;
+
 }
 
-int y_smoothbox_symmetric_b(lua_State* L)
-{
-  static const int NARG = 14;
 
-  /* Desired values */
-  const vector phi     = veclua_tovector(L, -NARG+0);
+int tau_gaussian_symmetric_s(lua_State* L) {
 
-  /* free surface grid arguments */
-  const vector theta_s  = veclua_tovector(L, -NARG+1);
-  const vector beta_s   = veclua_tovector(L, -NARG+2);
-  const vector phi_sub  = veclua_tovector(L, -NARG+3);
-  const vector dphi_sub = veclua_tovector(L, -NARG+4);
-  const vector beta_sub = veclua_tovector(L, -NARG+5);
+    /* topography parameters
+     * A - the amplitude
+     * B - the coefficient of x in the exponential
+     * L - the actual physical distance between inflection points */
 
-  /* topography parameters */
-  const real A     = lua_tonumber(L,-NARG+6);
-  const real B     = lua_tonumber(L,-NARG+7);
-  const real l     = lua_tonumber(L,-NARG+8);
-  const real phi_c = lua_tonumber(L,-NARG+9);
+    return tau_symmetric_s(L, 3, gaussian_b);
 
-  /* far field parameters */
-  const real D          = lua_tonumber(L, -NARG+10);
-  const real lambda     = lua_tonumber(L, -NARG+11);
-  const real gamma      = lua_tonumber(L, -NARG+12);
-  const real s          = lua_tonumber(L, -NARG+13);
+}
 
-  lua_pop(L, NARG);
 
-  linear_params lin_us = {lambda, gamma, D, -phi_sub(phi_sub.length())};
-  linear_params lin_ds = {lambda, gamma, D,  phi_sub(phi_sub.length())};
+int tau_smoothbox_symmetric_s(lua_State* L) {
 
-  vector tpgraphy_params = vector(4);
-  tpgraphy_params(1) = A;
-  tpgraphy_params(2) = B;
-  tpgraphy_params(3) = l;
-  tpgraphy_params(4) = phi_c;
+    /* topography parameters
+     * A - the amplitude (depth)
+     * B - rate (of decay) in the exponential terms
+     * l - the actual physical distance between inflection points
+     * phi_c - location of inflection points in phi */
 
-  lua_pushstring(L, integrals_lualib_regkey);
-  lua_gettable(L, LUA_REGISTRYINDEX);
-  gsl_integration_workspace **ws = (gsl_integration_workspace**)lua_touserdata(L, -1);
+    return tau_symmetric_s(L, 4, smoothbox_b);
 
-  method_b_funcs homotopy_method = {&pwlinear_cubic_homotopy_phi,
-                                   &pwlinear_cubic_homotopy_dphi,
-                                                &smoothbox_theta,
-                     &topography_compute_symmetric_convolution_s,
-                               &topography_smoothbox_integrand_b,
-                     &topography_smoothbox_removed_singularity_b,
-                                      &topography_far_upstream_s,
-                                    &topography_far_downstream_s};
+}
 
-  const vector y_b = y_b_worker(phi,
-                            theta_s,
-                             beta_s,
-                           beta_sub,
-                            phi_sub,
-                           dphi_sub,
-                                  s,
-                                 ws,
-                    homotopy_method,
-                    tpgraphy_params,
-                             lin_us,
-                             lin_ds);
 
-  lua_newtable(L);
+static inline int z_b(lua_State* L,
+                      const int n_t_arg,
+                      tpgraphy_theta_func theta_f,
+                      tpgraphy_integrand_func integrand_b,
+                      removed_singularity_b_func singularity_f,
+                      cosine_or_sine cos_sin) {
 
-  for(unsigned int i = 1; i <= y_b.length(); i++) {
-    lua_pushnumber(L, i);
-    lua_pushnumber(L, y_b(i));
-    lua_rawset(L, -3);
-  }
+    const int NARG = 12 + n_t_arg;
 
-  return 1;
+    const int m     = veclua_veclength(L, -NARG+0);
+    const int n     = veclua_veclength(L, -NARG+1);
+    const int n_sub = veclua_veclength(L, -NARG+3);
+
+    const std::unique_ptr<real[]> heap_v(
+                                      new real[(2*m)+(2*n)+(3*n_sub)+n_t_arg]
+                                  );
+
+    /* free surface grid arguments */
+    const real_vector      phi(    m,                 &(heap_v[0]), L, -NARG+0);
+    const real_vector  theta_s(    n,                 &(heap_v[m]), L, -NARG+1);
+    const real_vector   beta_s(    n,               &(heap_v[m+n]), L, -NARG+2);
+    const real_vector  phi_sub(n_sub,           &(heap_v[m+(2*n)]), L, -NARG+3);
+    const real_vector dphi_sub(n_sub,     &(heap_v[m+(2*n)+n_sub]), L, -NARG+4);
+    const real_vector beta_sub(n_sub, &(heap_v[m+(2*n)+(2*n_sub)]), L, -NARG+5);
+    /* output vector */
+    real_vector z_b(m, &(heap_v[m+(2*n)+(3*n_sub)]));
+
+    /* topography parameters */
+    real_vector topography_params(4, &(heap_v[(2*m)+(2*n)+(3*n_sub)]));
+    for(int j = 1; j <= n_t_arg; j++) {
+        topography_params(j) = lua_tonumber(L, -NARG+5+j);
+    }
+
+    /* far field parameters */
+    const real D_ffus      = lua_tonumber(L, -NARG+n_t_arg+6);
+    const real D_ffds      = lua_tonumber(L, -NARG+n_t_arg+7);
+    const real lambda_ffus = lua_tonumber(L, -NARG+n_t_arg+8);
+    const real lambda_ffds = lua_tonumber(L, -NARG+n_t_arg+9);
+    const real gamma  = lua_tonumber(L, -NARG+n_t_arg+10);
+
+    /* homotopy parameter */
+    const real s = lua_tonumber(L, -NARG+n_t_arg+11);
+
+
+    ff_params ffus_params = {lambda_ffus,
+                             gamma,
+                             D_ffus,
+                             phi_sub(1)};
+    ff_params ffds_params = {lambda_ffds,
+                             gamma,
+                             D_ffds,
+                             phi_sub(phi_sub.length())};
+
+    lua_pushstring(L, integrals_lualib_regkey);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    gsl_integration_workspace **ws = 
+        (gsl_integration_workspace**)lua_touserdata(L, -1);
+
+    method_b_funcs homotopy_method = {pwlinear_cubic_homotopy_phi,
+                                      pwlinear_cubic_homotopy_dphi,
+                                      theta_f,
+                                      topography_compute_convolution_s,
+                                      integrand_b,
+                                      singularity_f,
+                                      topography_far_upstream_s,
+                                      topography_far_downstream_s};
+
+    z_b_worker(              phi,
+                         theta_s,      beta_s,
+                        beta_sub,     phi_sub, dphi_sub,
+                               s,          ws,
+                 homotopy_method,
+               topography_params,
+                     ffus_params, ffds_params,
+                         cos_sin,
+                             z_b);
+
+    veclua_pushtable(L, z_b);
+
+    return 1;
+
+}
+
+
+int x_gaussian_b(lua_State* L) {
+
+    return z_b(L,
+               3,
+               gaussian_theta,
+               topography_gaussian_integrand_b,
+               topography_gaussian_removed_singularity_b,
+               USE_COSINE);
+
+}
+
+
+int y_gaussian_b(lua_State* L) {
+
+    return z_b(L,
+               3,
+               gaussian_theta,
+               topography_gaussian_integrand_b,
+               topography_gaussian_removed_singularity_b,
+               USE_SINE);
+
+}
+
+
+int x_smoothbox_b(lua_State* L) {
+
+    return z_b(L,
+               4,
+               smoothbox_theta,
+               topography_smoothbox_integrand_b,
+               topography_smoothbox_removed_singularity_b,
+               USE_COSINE);
+
+}
+
+
+int y_smoothbox_b(lua_State* L) {
+
+    return z_b(L,
+               4,
+               smoothbox_theta,
+               topography_smoothbox_integrand_b,
+               topography_smoothbox_removed_singularity_b,
+               USE_SINE);
+
+}
+
+
+inline int z_symmetric_b(lua_State* L,
+                         const int n_t_arg,
+                         tpgraphy_theta_func theta_f,
+                         tpgraphy_integrand_func integrand_b,
+                         removed_singularity_b_func singularity_f,
+                         cosine_or_sine cos_sin) {
+
+    const int NARG = 10 + n_t_arg;
+
+    const int m     = veclua_veclength(L, -NARG+0);
+    const int n     = veclua_veclength(L, -NARG+1);
+    const int n_sub = veclua_veclength(L, -NARG+3);
+
+    const std::unique_ptr<real[]> heap_v(
+                                      new real[(2*m)+(2*n)+(3*n_sub)+n_t_arg]
+                                  );
+
+    /* free surface grid arguments */
+    const real_vector      phi(    m,                 &(heap_v[0]), L, -NARG+0);
+    const real_vector  theta_s(    n,                 &(heap_v[m]), L, -NARG+1);
+    const real_vector   beta_s(    n,               &(heap_v[m+n]), L, -NARG+2);
+    const real_vector  phi_sub(n_sub,           &(heap_v[m+(2*n)]), L, -NARG+3);
+    const real_vector dphi_sub(n_sub,     &(heap_v[m+(2*n)+n_sub]), L, -NARG+4);
+    const real_vector beta_sub(n_sub, &(heap_v[m+(2*n)+(2*n_sub)]), L, -NARG+5);
+    /* output vector */
+    real_vector z_b(m, &(heap_v[m+(2*n)+(3*n_sub)]));
+
+    /* topography parameters */
+    real_vector topography_params(4, &(heap_v[(2*m)+(2*n)+(3*n_sub)]));
+    for(int j = 1; j <= n_t_arg; j++) {
+        topography_params(j) = lua_tonumber(L, -NARG+5+j);
+    }
+
+    /* far field parameters */
+    const real D      = lua_tonumber(L, -NARG+n_t_arg+6);
+    const real lambda = lua_tonumber(L, -NARG+n_t_arg+7);
+    const real gamma  = lua_tonumber(L, -NARG+n_t_arg+8);
+
+    /* homotopy parameter */
+    const real s = lua_tonumber(L, -NARG+n_t_arg+9);
+
+
+    ff_params ffus_params = {lambda, gamma, D, -phi_sub(phi_sub.length())};
+    ff_params ffds_params = {lambda, gamma, D,  phi_sub(phi_sub.length())};
+
+    lua_pushstring(L, integrals_lualib_regkey);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    gsl_integration_workspace **ws = 
+        (gsl_integration_workspace**)lua_touserdata(L, -1);
+
+    method_b_funcs homotopy_method = {pwlinear_cubic_homotopy_phi,
+                                      pwlinear_cubic_homotopy_dphi,
+                                      theta_f,
+                                      topography_compute_symmetric_convolution_s,
+                                      integrand_b,
+                                      singularity_f,
+                                      topography_far_upstream_s,
+                                      topography_far_downstream_s};
+
+    z_b_worker(              phi,
+                         theta_s,      beta_s,
+                        beta_sub,     phi_sub, dphi_sub,
+                               s,          ws,
+                 homotopy_method,
+               topography_params,
+                     ffus_params, ffds_params,
+                         cos_sin,
+                             z_b);
+
+    veclua_pushtable(L, z_b);
+
+    return 1;
+
+}
+
+
+int x_gaussian_symmetric_b(lua_State* L) {
+
+    return z_symmetric_b(L,
+                         3,
+                         gaussian_theta,
+                         topography_gaussian_integrand_b,
+                         topography_gaussian_removed_singularity_b,
+                         USE_COSINE);
+
+}
+
+
+int y_gaussian_symmetric_b(lua_State* L) {
+
+    return z_symmetric_b(L,
+                         3,
+                         gaussian_theta,
+                         topography_gaussian_integrand_b,
+                         topography_gaussian_removed_singularity_b,
+                         USE_SINE);
+
+}
+
+
+int x_smoothbox_symmetric_b(lua_State* L) {
+
+    return z_symmetric_b(L,
+                         4,
+                         smoothbox_theta,
+                         topography_smoothbox_integrand_b,
+                         topography_smoothbox_removed_singularity_b,
+                         USE_COSINE);
+
+}
+
+
+int y_smoothbox_symmetric_b(lua_State* L) {
+
+    return z_symmetric_b(L,
+                         4,
+                         smoothbox_theta,
+                         topography_smoothbox_integrand_b,
+                         topography_smoothbox_removed_singularity_b,
+                         USE_SINE);
+
 }
 

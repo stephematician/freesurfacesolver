@@ -1,4 +1,4 @@
-/** \file vector.h
+/** \file real_vector.h
 
   A mathematical library for vector and matrix computations which interfaces
   with Lua. Provides a simple linear system solver and QR factorisation method.
