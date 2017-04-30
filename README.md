@@ -40,10 +40,12 @@ The basic directory structure
 Build requirements:
 
   - [GNU Scientific Library](gsl_link);
-  - Lua 5.2; and
-  - C++0x
+  - [Lua 5.2](lua_link); and
+  - C++0x and GNU tool chain
 
-The C++ libraries can be built using the GNU make tool chain
+### Build Lua libraries
+
+The Lua libraries can be built using the GNU make tool chain
 
   - on Ubuntu 14.04 LTS (tested)
   ```
@@ -77,4 +79,4 @@ per the publications and thesis. These scripts are _not_ Octave compatible.
 thesis_link:http://hdl.handle.net/2440/97905 
 jfm_link: https://doi.org/10.1017/jfm.2013.590
 gsl_link: https://www.gnu.org/software/gsl/
-
+lua_link: https://www.lua.org/manual/5.2/
