@@ -178,18 +178,18 @@ void integrals_sbox_handler(const char *reason,
     \param method current method functions.
     \param tau_s (n-1)-vector to store returned \f$\tau_s(\beta_{i+1/2})\f$.
  */
-void tau_s_worker(const real_vector&       theta_s, 
-                  const real_vector&       phi_sub,
-                  const real_vector&      dphi_sub,
-                  const real_vector&          beta,
-                  const real_vector&      beta_sub,
-                  const real_vector&    topography,
-                  const ff_params&     ffus_params,
-                  const ff_params&     ffds_params,
-                  const real                     s,
-                  gsl_integration_workspace**   ws,
-                  method_s_funcs&           method,
-                  real_vector&               tau_s);
+void tau_s_worker(const real_vector &    theta_s, 
+                  const real_vector &    phi_sub,
+                  const real_vector &   dphi_sub,
+                  const real_vector &       beta,
+                  const real_vector &   beta_sub,
+                  const real_vector & topography,
+                  const ff_params &  ffus_params,
+                  const ff_params &  ffds_params,
+                  const real                   s,
+                  gsl_integration_workspace** ws,
+                  const method_s_funcs &  method,
+                  real_vector &            tau_s);
 
 
 /** Generalised mid-point method for calculating \f$x_s(\beta_{i+1/2})\f$ r

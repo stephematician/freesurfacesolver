@@ -49,7 +49,6 @@ macosx : LUA_MOD_LINK = $(CXX) -bundle -undefined dynamic_lookup
 macosx : LUA_MOD_COMPILE = $(CXX) -fPIC -c
 
 CFLAGS = -I$(INCLUDE_DIR) $(LUA_CFLAGS) $(GSL_CFLAGS) -D __VECTOR_USE_GSL -std=c++11 
-    
 
 export LUA_LIBS GSL_LIBS
 export LT_OEXT LT_EXT LT_CEXT LT_PRE LT_OPRE

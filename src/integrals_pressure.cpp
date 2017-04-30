@@ -78,8 +78,8 @@ void u_s_worker(const real_vector&         v_s,
                 const ff_params &  ffds_params,
                 const real                   s,
                 gsl_integration_workspace** ws,
-                method_funcs &          method,
-                real_vector                u_s) {
+                const method_funcs &    method,
+                real_vector &              u_s) {
 
     const unsigned int n = beta.length();
 

@@ -15,11 +15,11 @@ $(LIB_DIR)/integrals_pressure_homotopy.so : \
 	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_pressure_homotopy.cpp \
 	    -o $(OBJ_DIR)/integrals_pressure_homotopy$(LT_CEXT)
 	$(LUA_MOD_LINK) -o $(LIB_DIR)/$(LT_PRE)integrals_pressure_homotopy$(LT_EXT) \
+	    $(OBJ_DIR)/integrals_pressure_homotopy$(LT_CEXT) \
 	    $(OBJ_DIR)/integrals_pressure$(LT_CEXT) \
 	    $(OBJ_DIR)/integrals_pressure_formulation$(LT_CEXT) \
-	    $(OBJ_DIR)/integrals_pressure_homotopy$(LT_CEXT) \
-	    $(OBJ_DIR)/real_vector$(LT_CEXT) \
 	    $(OBJ_DIR)/pwpoly$(LT_CEXT) \
+	    $(OBJ_DIR)/real_vector$(LT_CEXT) \
 	    $(GSL_LIBS)
 	mv $(LIB_DIR)/$(LT_OPRE)integrals_pressure_homotopy$(LT_OEXT) $@
 
@@ -46,12 +46,12 @@ $(LIB_DIR)/integrals_sbox_homotopy.so : \
 	$(LUA_MOD_COMPILE) $(CFLAGS) integrals_sbox_homotopy.cpp \
 	    -o $(OBJ_DIR)/integrals_sbox_homotopy$(LT_CEXT)
 	$(LUA_MOD_LINK) -o $(LIB_DIR)/$(LT_PRE)integrals_sbox_homotopy$(LT_EXT) \
-	    $(OBJ_DIR)/integrals_sbox$(LT_CEXT) \
-	    $(GSL_LIBS) \
-	    $(OBJ_DIR)/integrals_sbox_formulation$(LT_CEXT) \
 	    $(OBJ_DIR)/integrals_sbox_homotopy$(LT_CEXT) \
+	    $(OBJ_DIR)/integrals_sbox$(LT_CEXT) \
+	    $(OBJ_DIR)/integrals_sbox_formulation$(LT_CEXT) \
+	    $(OBJ_DIR)/pwpoly$(LT_CEXT) \
 	    $(OBJ_DIR)/real_vector$(LT_CEXT) \
-	    $(OBJ_DIR)/pwpoly$(LT_CEXT)
+	    $(GSL_LIBS)
 	mv $(LIB_DIR)/$(LT_OPRE)integrals_sbox_homotopy$(LT_OEXT) $@
 
 $(OBJ_DIR)/integrals_sbox_formulation$(LT_CEXT) : \

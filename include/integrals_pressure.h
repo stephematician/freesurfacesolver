@@ -94,17 +94,17 @@ int luaopen_integrals_pressure(lua_State *L);
     \param method current method functions.
     \param u_s (n-1)-vector to store returned \f$u_s(\beta_{i+1/2})\f$.
 */
-void u_s_worker(const real_vector &             v_s,
-                  const real_vector &       phi_sub, 
-                  const real_vector &      dphi_sub,
-                  const real_vector &          beta,
-                  const real_vector &      beta_sub,
-                  const ff_params &     lin_ustream,
-                  const ff_params &     lin_dstream,
-                  const real                      s,
-                  gsl_integration_workspace**    ws,
-                  method_funcs&              method,
-                  real_vector &                 u_s);
+void u_s_worker(const real_vector &           v_s,
+                const real_vector &       phi_sub, 
+                const real_vector &      dphi_sub,
+                const real_vector &          beta,
+                const real_vector &      beta_sub,
+                const ff_params &     lin_ustream,
+                const ff_params &     lin_dstream,
+                const real                      s,
+                gsl_integration_workspace**    ws,
+                const method_funcs&        method,
+                real_vector &                 u_s);
 
 
 /** Generalised mid-point method for calculating \f$x_s(\beta_{i+1/2})\f$ r

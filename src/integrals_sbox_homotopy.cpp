@@ -156,7 +156,7 @@ int y_homotopy_s(lua_State* L) {
 }
 
 
-static inline int tau_s(lua_State*                        L,
+int tau_s(lua_State*                        L,
                         const int                   n_t_arg,
                         tpgraphy_integrand_func integrand_b) {
 

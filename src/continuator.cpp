@@ -321,7 +321,8 @@ prog_result PCcontinuator::newton(const real_vector &x0,
 
             for(unsigned int i = 1; i <= m; i++)
                 J(i,j) = (y1(i) - y0(i)) / delta_x;
-      
+
+            /* Construct final row which ensures continuation parameter fixed */
             if(j != n) {
                 J(n,j) = 0.0;
             } else {
@@ -365,7 +366,7 @@ prog_result PCcontinuator::newton(const real_vector &x0,
                           fabs(y0(i)) :
                           err_val;
 
-        /* Not sure about this */
+        /* Include error in the continuation variable */
         err_val = err_val < fabs(soln(n) - x0(n)) ?
                             fabs(soln(n) - x0(n)) :
                             err_val;
@@ -576,14 +577,12 @@ int lua_continuator_progress(lua_State* L) {
 
     const unsigned int n_x = veclua_veclength(L, 2);
     const unsigned int n_t = veclua_veclength(L, 3);
-    const std::unique_ptr<real[]> heap_v(new real[2*n_x+n_t]);
+    const std::unique_ptr<real[]> heap_v(new real[(2*n_x)+n_t]);
 
-    real_vector x(n_x, &(heap_v[0]), L, 2);
+    const real_vector x(n_x, &(heap_v[0]), L, 2);
     real_vector o(n_x, &(heap_v[n_x]));
     real_vector t(n_t, &(heap_v[2*n_x]), L, 3);
 
-//    veclua_tovector(L, 2, x);
-//    veclua_tovector(L, 3, t);
     nc_dirn dir = (nc_dirn)lua_tonumber(L, 4);
 
     lua_remove(L, 4);
@@ -636,11 +635,9 @@ int lua_continuator_newton(lua_State* L) {
 
     const std::unique_ptr<real[]> heap_v(new real[2*n_x]);
 
-    real_vector x(n_x, &(heap_v[0]), L, 2);
+    const real_vector x(n_x, &(heap_v[0]), L, 2);
     real_vector o(n_x, &(heap_v[1]));
 
-//    veclua_tovector(L, 2, x);
-  
     lua_remove(L, 2);
     lua_remove(L, 1);
   
