@@ -307,7 +307,7 @@ prog_result PCcontinuator::newton(const real_vector &x0,
     while(err_val >= err_tol) {
 
         if(attempts > PCC_MAX_ATTEMPTS) {
-            progress_diverged = true;
+            refinement_diverged = true;
             break;
         }
     
@@ -376,7 +376,7 @@ prog_result PCcontinuator::newton(const real_vector &x0,
     for(unsigned int i = 1; i <= n; i++)
         x(i) = soln(i);
 
-    return progress_diverged ? PROGRESS_DIVERGED : PROGRESS_CONVERGED;
+    return refinement_diverged ? PROGRESS_DIVERGED : PROGRESS_CONVERGED;
 
 }
 
