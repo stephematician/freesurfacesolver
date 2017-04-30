@@ -4,7 +4,7 @@ Free surface continuation
 _Stephen Wade_
 
 This is the code for the thesis
-[Very steep forced solitary waves in two-dimensional free surface flow](thesis_link).
+[Very steep forced solitary waves in two-dimensional free surface flow][thesis_link].
 
 The original plan was to have most of the computational work done in C++, with
 the residual for the system of equations specified as a Lua script. This ended
@@ -12,7 +12,7 @@ up being a somewhat poor choice, as the residual function can occupy a lot of
 computational time.
 
 The code was use to produce all the figures in the thesis, and the figures for
-the publication [On the free-surface flow of steep forced solitary waves](jfm_link).
+the publication [On the free-surface flow of steep forced solitary waves][jfm_link].
 
 Another publication based on the results in Chapter 4 of the thesis has been
 accepted, with link/details pending.
@@ -39,8 +39,8 @@ The basic directory structure
 
 Build requirements:
 
-  - [GNU Scientific Library](gsl_link);
-  - [Lua 5.2](lua_link); and
+  - [GNU Scientific Library][gsl_link];
+  - [Lua 5.2][lua_link]; and
   - C++0x and GNU tool chain
 
 ### Build Lua libraries
