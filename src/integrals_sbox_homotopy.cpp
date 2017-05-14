@@ -157,8 +157,8 @@ int y_homotopy_s(lua_State* L) {
 
 
 int tau_s(lua_State*                        L,
-                        const int                   n_t_arg,
-                        tpgraphy_integrand_func integrand_b) {
+          const int                   n_t_arg,
+          tpgraphy_integrand_func integrand_b) {
 
     const int NARG = 11 + n_t_arg;
 
@@ -180,7 +180,7 @@ int tau_s(lua_State*                        L,
     real_vector tau_s(n-1, &(heap_v[m+n+(3*n_sub)]));
 
     /* topography parameters */
-    real_vector topography_params(4, &(heap_v[m+n+(n-1)+(3*n_sub)]));
+    real_vector topography_params(n_t_arg, &(heap_v[m+n+(n-1)+(3*n_sub)]));
     for(int j = 1; j <= n_t_arg; j++) {
         topography_params(j) = lua_tonumber(L, -NARG+4+j);
     }
@@ -286,7 +286,7 @@ static inline int tau_symmetric_s(lua_State*                        L,
     real_vector tau_s(n-1, &(heap_v[m+n+(3*n_sub)]));
 
     /* topography parameters */
-    real_vector topography_params(4, &(heap_v[m+n+(n-1)+(3*n_sub)]));
+    real_vector topography_params(n_t_arg, &(heap_v[m+n+(n-1)+(3*n_sub)]));
     for(int j = 1; j <= n_t_arg; j++) {
         topography_params(j) = lua_tonumber(L, -NARG+4+j);
     }
