@@ -11,15 +11,20 @@ the residual for the system of equations specified as a Lua script. This ended
 up being a somewhat poor choice, as the residual function can occupy a lot of
 computational time.
 
+The continuation method implemented is based on the pseudo-arclength approach in
+[Numerical Continuation Methods][continuation_link].
+
 The code was use to produce all the figures in the thesis, and the figures for
-the publication [On the free-surface flow of steep forced solitary waves][jfm_link].
+the publication
+[On the free-surface flow of steep forced solitary waves][jfm_link].
 
 Another publication based on the results in Chapter 4 of the thesis has been
 accepted, with link/details pending.
 
 Anyway, don't judge me too harshly, it was a big learning process. I have
 updated the code to be slightly more memory friendly, and attempted to
-consolidate a lot of the Lua scripts.
+consolidate a lot of the Lua scripts. I am also the clumsiest user of git, but
+it's only me working on this project so I get a free pass, right?
 
 The MATLAB scripts are, in my opinion, a rushed together hack. I would not be
 surprised if they break easily, and it is best to ignore them as they are only
@@ -33,7 +38,8 @@ The basic directory structure
   - `lua` - Lua modules for free surface problem
   - `matlab` - scripts (MATLAB) used to generate .tikz output
   - `src` - source files for C libraries required by Lua modules for free-
-      surface problem.
+      surface problem, computes integrals, solves systems and does
+      pseudo-arclength continuation steps.
 
 ## Instructions
 
@@ -76,7 +82,8 @@ values of the speed at the crest.
 The various `matlab` scripts supplied can be used to generate .tikz output as
 per the publications and thesis. These scripts are _not_ Octave compatible.
 
-[thesis_link]: http://hdl.handle.net/2440/97905 
+[thesis_link]: http://hdl.handle.net/2440/97905
+[continuation_link]: https://link.springer.com/book/10.1007/978-3-642-61257-2
 [jfm_link]: https://doi.org/10.1017/jfm.2013.590
 [gsl_link]: https://www.gnu.org/software/gsl/
 [lua_link]: https://www.lua.org/manual/5.2/
